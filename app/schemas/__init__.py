@@ -1,2 +1,1 @@
-from . import user, course, syllabus, token
-
+from . import user, course, syllabus, token, material

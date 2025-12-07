@@ -35,4 +35,3 @@ class Syllabus(Base):
         # Indexes for performance
         Index('ix_syllabus_course_week', 'course_id', 'week_number'),
     )
-

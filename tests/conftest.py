@@ -1,25 +1,32 @@
 import pytest
+import os
 from typing import Generator
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
 # Import all models to ensure they're registered with Base
-from app.models import User, Course, Syllabus
+from app.models import User, Course, Syllabus, Material, MaterialTopic, CrawlLog
 
-# Use SQLite in-memory database with StaticPool to share connection
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+# Use file-based SQLite database for tests (avoids in-memory isolation issues)
+TEST_DB_PATH = "/tmp/test_fyp.db"
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={
         "check_same_thread": False,
     },
-    poolclass=StaticPool,  # Share the same connection for in-memory DB
 )
+
+# Enable foreign keys for SQLite (required for cascade deletes)
+@event.listens_for(engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -42,8 +49,6 @@ def db() -> Generator:
 @pytest.fixture(scope="function")
 def client(db) -> Generator:
     """Create a test client with database override"""
-    # Ensure tables are created before client uses them
-    Base.metadata.create_all(bind=engine)
     
     def override_get_db():
         try:
