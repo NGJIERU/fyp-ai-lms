@@ -47,3 +47,17 @@ def get_current_active_superuser(
             status_code=400, detail="The user doesn't have enough privileges"
         )
     return current_user
+
+def get_current_lecturer(
+    current_user: models.User = Depends(get_current_active_user),
+) -> models.User:
+    """
+    Dependency to ensure the current user is a lecturer or super admin.
+    Used for course and syllabus management endpoints.
+    """
+    if current_user.role not in [models.UserRole.LECTURER, models.UserRole.SUPER_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only lecturers and super admins can perform this action"
+        )
+    return current_user
