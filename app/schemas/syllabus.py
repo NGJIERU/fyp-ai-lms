@@ -36,7 +36,6 @@ class SyllabusRead(SyllabusBase):
 
     class Config:
         from_attributes = True
-        orm_mode = True
 
 class SyllabusBulkCreate(BaseModel):
     """Schema for bulk creating 14-week syllabus"""

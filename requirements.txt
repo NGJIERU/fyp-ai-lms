@@ -1,26 +1,37 @@
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-sqlalchemy==2.0.25
-alembic==1.13.1
-psycopg2-binary==2.9.9
-pydantic==2.6.0
-pydantic-settings==2.1.0
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
-httpx==0.26.0
-pytest==7.4.4
-pytest-asyncio==0.23.4
-email-validator==2.1.0.post1
+# Core FastAPI dependencies
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+sqlalchemy>=2.0.25
+alembic>=1.13.1
+psycopg2-binary>=2.9.10
+pydantic>=2.9.0
+pydantic-settings>=2.1.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6
+httpx>=0.26.0
+email-validator>=2.1.0
+
+# Testing dependencies
+pytest>=7.4.4
+pytest-asyncio>=0.23.4
+pytest-cov>=4.1.0
+
 # Material Crawling dependencies
-beautifulsoup4==4.12.2
-lxml==4.9.3
-PyPDF2==3.0.1
-python-pptx==0.6.23
-openai==1.12.0
-sentence-transformers==2.2.2
-youtube-transcript-api==0.6.1
-arxiv==2.1.0
-PyGithub==2.1.1
-requests==2.31.0
-numpy==1.24.3
+beautifulsoup4>=4.12.2
+lxml>=5.1.0
+PyPDF2>=3.0.1
+python-pptx>=0.6.23
+youtube-transcript-api>=0.6.1
+arxiv>=2.1.0
+PyGithub>=2.1.1
+requests>=2.31.0
+
+# AI/ML dependencies (Python 3.13 compatible)
+openai>=1.12.0
+sentence-transformers>=2.6.0
+numpy>=1.26.0
+torch>=2.2.0
+
+# Optional: pgVector for PostgreSQL vector search
+# pgvector>=0.2.4
