@@ -289,18 +289,24 @@ class EmbeddingService:
         return self.embed_text(text)
 
 
-# Singleton instance for convenience
-_embedding_service: Optional[EmbeddingService] = None
+# Singleton cache for convenience
+_embedding_services: dict[tuple[str, bool, Optional[str]], EmbeddingService] = {}
 
 
 def get_embedding_service(
     model_name: str = "local_fast",
-    use_openai: bool = False
+    use_openai: bool = False,
+    openai_api_key: Optional[str] = None
 ) -> EmbeddingService:
     """
-    Get or create the embedding service singleton.
+    Get or create the embedding service singleton for a given configuration.
     """
-    global _embedding_service
-    if _embedding_service is None:
-        _embedding_service = EmbeddingService(model_name=model_name, use_openai=use_openai)
-    return _embedding_service
+    global _embedding_services
+    key = (model_name, use_openai, openai_api_key if use_openai else None)
+    if key not in _embedding_services:
+        _embedding_services[key] = EmbeddingService(
+            model_name=model_name,
+            use_openai=use_openai,
+            openai_api_key=openai_api_key
+        )
+    return _embedding_services[key]

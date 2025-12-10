@@ -1,0 +1,425 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+
+import { apiFetch } from "@/lib/api";
+import { useRequireRole } from "@/hooks/useRequireRole";
+
+type LecturerCourseStats = {
+  course_id: number;
+  course_code: string;
+  course_name: string;
+  enrolled_students: number;
+  avg_class_score: number;
+  materials_count: number;
+  pending_approvals: number;
+};
+
+type Submission = {
+  student_id: number;
+  course_id: number;
+  week_number: number;
+  score: number;
+  attempted_at?: string | null;
+};
+
+type LecturerDashboardResponse = {
+  courses: LecturerCourseStats[];
+  recent_submissions: Submission[];
+};
+
+type CourseDetail = {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  lecturer_id?: number | null;
+  lecturer_name?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type StudentPerformanceItem = {
+  student_id: number;
+  student_name: string;
+  email: string;
+  average_score: number;
+  weak_topics: string[];
+  last_active?: string | null;
+};
+
+type WeekAnalytics = {
+  week_number: number;
+  topic: string;
+  avg_score: number;
+  attempts_count: number;
+  common_mistakes: string[];
+};
+
+export default function LecturerCourseDetailPage() {
+  const router = useRouter();
+  const params = useParams<{ courseId: string }>();
+  const courseId = Number(params?.courseId);
+  const { loading: authLoading, authorized } = useRequireRole(["lecturer", "super_admin"]);
+
+  const [course, setCourse] = useState<LecturerCourseStats | null>(null);
+  const [courseDetail, setCourseDetail] = useState<CourseDetail | null>(null);
+  const [weekAnalytics, setWeekAnalytics] = useState<WeekAnalytics[]>([]);
+  const [students, setStudents] = useState<StudentPerformanceItem[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<"score" | "last_active">("score");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!authorized) return;
+    if (!courseId || Number.isNaN(courseId)) {
+      setError("Invalid course");
+      setIsLoading(false);
+      return;
+    }
+
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadCourseData() {
+      try {
+        const [dashboardRes, analyticsRes, studentsRes, detailRes] = await Promise.all([
+          apiFetch<LecturerDashboardResponse>("/api/v1/dashboard/lecturer", {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }),
+          apiFetch<WeekAnalytics[]>(`/api/v1/dashboard/lecturer/course/${courseId}/analytics`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }),
+          apiFetch<StudentPerformanceItem[]>(`/api/v1/dashboard/lecturer/course/${courseId}/students`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }),
+          apiFetch<CourseDetail>(`/api/v1/courses/${courseId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          }),
+        ]);
+
+        const selectedCourse = dashboardRes.courses.find((c) => c.course_id === courseId) || null;
+        if (!selectedCourse) {
+          setError("Course not found or not assigned to you");
+        } else {
+          setCourse(selectedCourse);
+          setCourseDetail(detailRes);
+          setSubmissions(dashboardRes.recent_submissions.filter((s) => s.course_id === courseId));
+          setWeekAnalytics(analyticsRes);
+          setStudents(studentsRes);
+        }
+      } catch (err: any) {
+        if (err.name === "AbortError") return;
+        setError(err.message ?? "Unable to load course analytics");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadCourseData();
+    return () => controller.abort();
+  }, [authLoading, authorized, courseId, router]);
+
+  const highestWeek = useMemo(() => {
+    if (weekAnalytics.length === 0) return null;
+    return [...weekAnalytics].sort((a, b) => b.avg_score - a.avg_score)[0];
+  }, [weekAnalytics]);
+
+  const lowestWeek = useMemo(() => {
+    if (weekAnalytics.length === 0) return null;
+    return [...weekAnalytics].sort((a, b) => a.avg_score - b.avg_score)[0];
+  }, [weekAnalytics]);
+
+  const sortedStudents = useMemo(() => {
+    const copy = [...students];
+    return copy.sort((a, b) => {
+      if (sortField === "score") {
+        return sortOrder === "desc" ? b.average_score - a.average_score : a.average_score - b.average_score;
+      }
+      const aTime = a.last_active ? new Date(a.last_active).getTime() : 0;
+      const bTime = b.last_active ? new Date(b.last_active).getTime() : 0;
+      return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
+    });
+  }, [students, sortField, sortOrder]);
+
+  const syllablesCount = weekAnalytics.length;
+  const createdDate = courseDetail ? new Date(courseDetail.created_at).toLocaleDateString() : null;
+  const updatedDate = courseDetail ? new Date(courseDetail.updated_at).toLocaleDateString() : null;
+
+  const handleEmailAll = useCallback(() => {
+    if (students.length === 0) return;
+    const emails = students.map((s) => s.email).join(",");
+    const subject = encodeURIComponent(`${course?.course_code ?? "Course"} update`);
+    const body = encodeURIComponent("Hello team,\n\nLet's discuss upcoming course updates.\n\n");
+    window.location.href = `mailto:?bcc=${encodeURIComponent(emails)}&subject=${subject}&body=${body}`;
+  }, [students, course?.course_code]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 px-4 py-10">
+        <div className="mx-auto max-w-6xl">
+          <div className="rounded-xl bg-white p-6 shadow-sm">
+            <p className="text-sm text-gray-500">Loading course analytics…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !course) {
+    return (
+      <div className="min-h-screen bg-gray-50 px-4 py-10">
+        <div className="mx-auto max-w-6xl">
+          <div className="rounded-xl bg-white p-6 shadow-sm">
+            <p className="text-sm text-red-600">{error ?? "Course not found"}</p>
+            <Link href="/lecturer/dashboard" className="mt-4 inline-flex text-sm font-medium text-indigo-600">
+              ← Back to dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 px-4 py-10">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <Link href="/lecturer/dashboard" className="text-sm font-medium text-indigo-600">
+            ← Back to dashboard
+          </Link>
+          <p className="text-sm uppercase tracking-wide text-indigo-600">Course analytics</p>
+          <h1 className="text-3xl font-semibold text-gray-900">
+            {course.course_name}
+            <span className="ml-3 rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">
+              {course.course_code}
+            </span>
+          </h1>
+          <p className="text-sm text-gray-500">Deep dive into enrollment, performance, and submissions.</p>
+        </div>
+
+        {courseDetail && (
+          <section className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl bg-white p-6 shadow-sm lg:col-span-2">
+              <h2 className="text-lg font-semibold text-gray-900">Course description</h2>
+              <p className="mt-2 text-sm text-gray-600">
+                {courseDetail.description || "No description provided for this course yet."}
+              </p>
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2 text-sm text-gray-500">
+                <div>
+                  <dt className="uppercase tracking-wide text-xs text-gray-400">Lecturer</dt>
+                  <dd className="mt-1 text-gray-900">{courseDetail.lecturer_name || "Unassigned"}</dd>
+                </div>
+                <div>
+                  <dt className="uppercase tracking-wide text-xs text-gray-400">Created</dt>
+                  <dd className="mt-1 text-gray-900">{createdDate ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="uppercase tracking-wide text-xs text-gray-400">Last updated</dt>
+                  <dd className="mt-1 text-gray-900">{updatedDate ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="uppercase tracking-wide text-xs text-gray-400">Syllabus weeks</dt>
+                  <dd className="mt-1 text-gray-900">{syllablesCount}</dd>
+                </div>
+              </dl>
+            </div>
+            <div className="rounded-2xl bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900">Quick actions</h2>
+              <div className="mt-4 space-y-3">
+                <Link
+                  href={`/lecturer/materials?course=${courseId}`}
+                  className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3 text-sm font-medium text-gray-700 hover:border-indigo-200"
+                >
+                  Review pending materials
+                  <span className="text-indigo-600">→</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleEmailAll}
+                  className="w-full rounded-xl border border-gray-100 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:border-indigo-200"
+                  disabled={students.length === 0}
+                >
+                  Message enrolled students
+                  <p className="text-xs text-gray-500">
+                    Sends an email to {students.length || "all"} students (via BCC)
+                  </p>
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <DetailStat label="Enrolled students" value={course.enrolled_students} subtext="Currently active" />
+          <DetailStat label="Average class score" value={`${course.avg_class_score.toFixed(1)}%`} subtext="Across all weeks" />
+          <DetailStat label="Approved materials" value={course.materials_count} subtext="Live in this course" />
+          <DetailStat
+            label="Pending approvals"
+            value={course.pending_approvals}
+            subtext="Awaiting review"
+            variant={course.pending_approvals > 0 ? "warning" : "default"}
+          />
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-3">
+          <div className="rounded-2xl bg-white p-6 shadow-sm lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Scores by week</h2>
+              {highestWeek && lowestWeek && (
+                <p className="text-xs text-gray-500">
+                  Best week: {highestWeek.topic} ({highestWeek.avg_score.toFixed(1)}%) · Struggling: {lowestWeek.topic} ({lowestWeek.avg_score.toFixed(1)}%)
+                </p>
+              )}
+            </div>
+            <div className="mt-6 space-y-4">
+              {weekAnalytics.length === 0 && (
+                <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No analytics yet. Encourage students to submit quizzes.</p>
+              )}
+              {weekAnalytics.map((week) => (
+                <div key={week.week_number} className="rounded-xl border border-gray-100 p-4">
+                  <div className="flex items-center justify-between text-sm text-gray-600">
+                    <span>
+                      Week {week.week_number}: <span className="font-medium text-gray-900">{week.topic}</span>
+                    </span>
+                    <span className="font-semibold text-gray-900">{week.avg_score.toFixed(1)}%</span>
+                  </div>
+                  <div className="mt-3 h-3 rounded-full bg-gray-100">
+                    <div
+                      className="h-3 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600"
+                      style={{ width: `${Math.min(Math.max(week.avg_score, 0), 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">{week.attempts_count} attempts logged</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">Recent submissions</h2>
+            <div className="mt-4 space-y-4">
+              {submissions.length === 0 && (
+                <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No recent submissions for this course.</p>
+              )}
+              {submissions.map((submission, index) => (
+                <div key={`${submission.student_id}-${index}`} className="rounded-lg border border-gray-100 p-4">
+                  <p className="text-sm font-medium text-gray-900">Student #{submission.student_id}</p>
+                  <p className="text-xs text-gray-500">Week {submission.week_number} · Score {submission.score?.toFixed(1) ?? "-"}%</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {submission.attempted_at ? new Date(submission.attempted_at).toLocaleString() : "Timestamp unavailable"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Student performance</h2>
+              <p className="text-sm text-gray-500">Track averages, weak topics, and last activity.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-xs uppercase tracking-wide text-gray-400">Sort by</label>
+              <select
+                className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-sm"
+                value={`${sortField}-${sortOrder}`}
+                onChange={(e) => {
+                  const [field, order] = e.target.value.split("-");
+                  setSortField(field as "score" | "last_active");
+                  setSortOrder(order as "asc" | "desc");
+                }}
+              >
+                <option value="score-desc">Highest score</option>
+                <option value="score-asc">Lowest score</option>
+                <option value="last_active-desc">Most recently active</option>
+                <option value="last_active-asc">Longest inactive</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-6 overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Student</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Average score</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Weak topics</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Last active</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {sortedStudents.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
+                      No students enrolled yet.
+                    </td>
+                  </tr>
+                )}
+                {sortedStudents.map((student) => (
+                  <tr key={student.student_id}>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-900">{student.student_name}</p>
+                      <p className="text-xs text-gray-500">{student.email}</p>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-gray-900">{student.average_score.toFixed(1)}%</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {student.weak_topics.length === 0 ? (
+                        <span className="text-gray-400">None</span>
+                      ) : (
+                        <ul className="list-disc space-y-1 pl-4">
+                          {student.weak_topics.map((topic) => (
+                            <li key={topic}>{topic}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {student.last_active ? new Date(student.last_active).toLocaleString() : "No activity logged"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function DetailStat({
+  label,
+  value,
+  subtext,
+  variant = "default",
+}: {
+  label: string;
+  value: string | number;
+  subtext: string;
+  variant?: "default" | "warning";
+}) {
+  const textClass = variant === "warning" ? "text-amber-600" : "text-gray-900";
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className={`mt-2 text-3xl font-semibold ${textClass}`}>{value}</p>
+      <p className="mt-2 text-xs text-gray-500">{subtext}</p>
+    </div>
+  );
+}

@@ -16,16 +16,34 @@ export async function apiFetch<T>(
     },
   });
 
+  const contentType = res.headers.get("content-type") ?? "";
+  const isJson = contentType.includes("application/json");
+  const bodyText = await res.text();
+
   if (!res.ok) {
     let message = res.statusText;
-    try {
-      const data = (await res.json()) as any;
-      if (data?.detail) message = data.detail;
-    } catch {
-      // ignore JSON parse errors
+    if (isJson && bodyText) {
+      try {
+        const data = JSON.parse(bodyText) as any;
+        if (data?.detail) message = data.detail;
+      } catch {
+        // ignore JSON parse errors
+      }
     }
     throw new Error(message || "Request failed");
   }
 
-  return (await res.json()) as T;
+  if (!bodyText.trim()) {
+    return undefined as T;
+  }
+
+  if (isJson) {
+    try {
+      return JSON.parse(bodyText) as T;
+    } catch {
+      // ignore JSON parse errors
+    }
+  }
+
+  return undefined as T;
 }

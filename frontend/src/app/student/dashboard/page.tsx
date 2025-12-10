@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -215,7 +216,10 @@ function SummaryCard({
 function CourseCard({ course }: { course: EnrolledCourse }) {
   const progress = Math.min(Math.max(course.progress_percent, 0), 100);
   return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+    <Link
+      href={`/student/course/${course.course_id}`}
+      className="block rounded-xl border border-gray-100 bg-gray-50/70 p-4 transition hover:border-indigo-200 hover:bg-white"
+    >
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm uppercase tracking-wide text-indigo-600">
@@ -228,14 +232,17 @@ function CourseCard({ course }: { course: EnrolledCourse }) {
             Lecturer: {course.lecturer_name ?? "TBA"}
           </p>
         </div>
-        {course.weak_topics_count > 0 && (
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-            {course.weak_topics_count} weak topics
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-2">
+          {course.weak_topics_count > 0 && (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+              {course.weak_topics_count} weak topics
+            </span>
+          )}
+          <span className="text-xs font-semibold text-indigo-600">View details →</span>
+        </div>
       </div>
       <div className="mt-4">
-        <div className="flex items-center justify_between text-xs text-gray-500">
+        <div className="flex items-center justify-between text-xs text-gray-500">
           <span>Progress</span>
           <span>{progress.toFixed(0)}%</span>
         </div>
@@ -246,6 +253,6 @@ function CourseCard({ course }: { course: EnrolledCourse }) {
           />
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

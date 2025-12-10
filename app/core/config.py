@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # AI / OpenAI settings
+    OPENAI_API_KEY: Optional[str] = None
+    AI_TUTOR_MODEL: str = "gpt-3.5-turbo"
+    USE_OPENAI_TUTOR: bool = False
+    USE_OPENAI_EMBEDDINGS: bool = False
+    EMBEDDING_MODEL_NAME: str = "local_fast"
+
     class Config:
         case_sensitive = True
         env_file = ".env"

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -204,7 +205,10 @@ function SummaryCard({
 
 function CourseRow({ course }: { course: LecturerCourseStats }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+    <Link
+      href={`/lecturer/course/${course.course_id}`}
+      className="block rounded-xl border border-gray-100 bg-gray-50/70 p-4 transition hover:border-indigo-200 hover:bg-white"
+    >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm uppercase tracking-wide text-indigo-600">{course.course_code}</p>
@@ -213,11 +217,14 @@ function CourseRow({ course }: { course: LecturerCourseStats }) {
             {course.enrolled_students} students · {course.materials_count} materials
           </p>
         </div>
-        {course.pending_approvals > 0 && (
-          <span className="self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-            {course.pending_approvals} pending approvals
-          </span>
-        )}
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          {course.pending_approvals > 0 && (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+              {course.pending_approvals} pending approvals
+            </span>
+          )}
+          <span className="text-xs font-semibold text-indigo-600">View analytics →</span>
+        </div>
       </div>
       <div className="mt-4">
         <div className="flex items-center justify-between text-xs text-gray-500">
@@ -231,6 +238,6 @@ function CourseRow({ course }: { course: LecturerCourseStats }) {
           />
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
