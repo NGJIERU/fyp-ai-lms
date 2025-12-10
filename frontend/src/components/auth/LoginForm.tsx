@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 type LoginResponse = {
   access_token: string;
@@ -8,7 +10,15 @@ type LoginResponse = {
   // extend with more fields from backend if needed
 };
 
+type MeResponse = {
+  id: number;
+  email: string;
+  full_name?: string | null;
+  role: string;
+};
+
 export default function LoginForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,9 +59,8 @@ export default function LoginForm() {
       if (typeof window !== "undefined") {
         localStorage.setItem("access_token", data.access_token);
       }
+      await redirectByRole();
 
-      // TODO: use router for role-based redirect once we have user info
-      window.location.href = "/";
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
@@ -122,4 +131,36 @@ export default function LoginForm() {
       </p>
     </form>
   );
+}
+
+async function redirectByRole() {
+  const token = localStorage.getItem("access_token");
+  if (!token) {
+    window.location.href = "/login";
+    return;
+  }
+
+  try {
+    const me = await apiFetch<MeResponse>("/api/v1/users/me", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    switch (me.role) {
+      case "student":
+        window.location.href = "/student/dashboard";
+        break;
+      case "lecturer":
+        window.location.href = "/lecturer/dashboard";
+        break;
+      case "super_admin":
+        window.location.href = "/admin/users";
+        break;
+      default:
+        window.location.href = "/";
+    }
+  } catch {
+    window.location.href = "/";
+  }
 }
