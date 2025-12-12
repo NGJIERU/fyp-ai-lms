@@ -43,6 +43,47 @@ class CourseRecommendationsResponse(BaseModel):
     weeks: dict  # week_number -> list of recommendations
 
 
+class PersonalizedRecommendationItem(BaseModel):
+    course_id: int
+    week_number: int
+    topic: str
+    material: dict
+    similarity_score: float
+    quality_score: float
+    base_score: float
+    personalized_score: float
+    reasons: List[str]
+
+
+class PersonalizedRecommendationsResponse(BaseModel):
+    course_id: int
+    student_id: int
+    recommendations: List[PersonalizedRecommendationItem]
+
+
+class BundleMaterialItem(BaseModel):
+    id: int
+    title: str
+    url: str
+    source: str
+    type: str
+    similarity_score: Optional[float] = None
+    quality_score: Optional[float] = None
+
+
+class ContextBundleItem(BaseModel):
+    course_id: int
+    week_number: int
+    topic: str
+    summary: str
+    materials: List[BundleMaterialItem]
+
+
+class ContextBundlesResponse(BaseModel):
+    course_id: int
+    bundles: List[ContextBundleItem]
+
+
 class PendingApprovalItem(BaseModel):
     mapping_id: int
     material_id: int
@@ -147,6 +188,68 @@ def get_recommendations_for_week(
     )
 
 
+@router.get("/context-bundles", response_model=ContextBundlesResponse)
+def get_context_bundles(
+    course_id: int = Query(..., description="Course ID to fetch bundles for"),
+    max_bundles: int = Query(5, ge=1, le=14),
+    materials_per_bundle: int = Query(3, ge=1, le=10),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    """
+    Get context-aware study bundles for a course (students + lecturers).
+    """
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if current_user.role == models.UserRole.STUDENT:
+        enrollment = (
+            db.query(models.StudentEnrollment)
+            .filter(
+                models.StudentEnrollment.student_id == current_user.id,
+                models.StudentEnrollment.course_id == course_id,
+                models.StudentEnrollment.is_active == True,
+            )
+            .first()
+        )
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not enrolled in this course",
+            )
+    elif current_user.role == models.UserRole.LECTURER:
+        if course.lecturer_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Lecturers can only view bundles for their own courses",
+            )
+
+    engine = get_recommendation_engine()
+    bundles = engine.generate_context_bundles(
+        db=db,
+        course_id=course_id,
+        max_bundles=max_bundles,
+        materials_per_bundle=materials_per_bundle,
+    )
+
+    bundle_items = []
+    for bundle in bundles:
+        bundle_items.append(
+            ContextBundleItem(
+                course_id=bundle["course_id"],
+                week_number=bundle["week_number"],
+                topic=bundle["topic"],
+                summary=bundle["summary"],
+                materials=[
+                    BundleMaterialItem(**material) for material in bundle["materials"]
+                ],
+            )
+        )
+
+    return ContextBundlesResponse(course_id=course_id, bundles=bundle_items)
+
+
 @router.get("/course/{course_id}", response_model=CourseRecommendationsResponse)
 def get_recommendations_for_course(
     course_id: int,
@@ -192,6 +295,62 @@ def get_recommendations_for_course(
     return CourseRecommendationsResponse(
         course_id=course_id,
         weeks=weeks_data
+    )
+
+
+@router.get("/personalized", response_model=PersonalizedRecommendationsResponse)
+def get_personalized_recommendations(
+    course_id: int = Query(..., description="Course ID to personalize for"),
+    top_k: int = Query(10, ge=1, le=30),
+    per_week: int = Query(3, ge=1, le=10),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    """
+    Get personalized recommendations for the current student by blending
+    similarity/quality scores with their mastery gaps and recency.
+    """
+    if current_user.role not in [models.UserRole.STUDENT, models.UserRole.SUPER_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can access personalized recommendations"
+        )
+
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if current_user.role == models.UserRole.STUDENT:
+        enrollment = (
+            db.query(models.StudentEnrollment)
+            .filter(
+                models.StudentEnrollment.student_id == current_user.id,
+                models.StudentEnrollment.course_id == course_id,
+                models.StudentEnrollment.is_active == True,
+            )
+            .first()
+        )
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not enrolled in this course",
+            )
+
+    engine = get_recommendation_engine()
+    personalized = engine.recommend_for_student(
+        db=db,
+        student_id=current_user.id,
+        course_id=course_id,
+        top_k=top_k,
+        per_week=per_week,
+    )
+
+    return PersonalizedRecommendationsResponse(
+        course_id=course_id,
+        student_id=current_user.id,
+        recommendations=[
+            PersonalizedRecommendationItem(**rec) for rec in personalized
+        ],
     )
 
 

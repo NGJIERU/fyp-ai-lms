@@ -44,6 +44,48 @@ type CourseDetailResponse = {
   total_materials: number;
 };
 
+type PersonalizedRecommendation = {
+  course_id: number;
+  week_number: number;
+  topic: string;
+  material: {
+    id: number;
+    title: string;
+    url: string;
+    source: string;
+    type: string;
+  };
+  similarity_score: number;
+  quality_score: number;
+  base_score: number;
+  personalized_score: number;
+  reasons: string[];
+};
+
+type ContextBundle = {
+  course_id: number;
+  week_number: number;
+  topic: string;
+  summary: string;
+  materials: {
+    id: number;
+    title: string;
+    url: string;
+    source: string;
+    type: string;
+    similarity_score?: number;
+    quality_score?: number;
+  }[];
+};
+
+type RatingSummary = {
+  material_id: number;
+  average_rating: number;
+  total_ratings: number;
+  upvotes: number;
+  downvotes: number;
+};
+
 type PracticeQuestionsResponse = {
   topic: string;
   week_number: number;
@@ -83,6 +125,10 @@ export default function StudentCourseDetailPage() {
   const [practiceLoadingWeek, setPracticeLoadingWeek] = useState<number | null>(null);
   const [tutorLoadingWeek, setTutorLoadingWeek] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [personalizedRecs, setPersonalizedRecs] = useState<PersonalizedRecommendation[]>([]);
+  const [bundles, setBundles] = useState<ContextBundle[]>([]);
+  const [ratings, setRatings] = useState<Record<number, RatingSummary>>({});
+  const [ratingInFlight, setRatingInFlight] = useState<number | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -98,17 +144,19 @@ export default function StudentCourseDetailPage() {
       router.replace("/login");
       return;
     }
+    const authToken = token;
 
     const controller = new AbortController();
     async function loadDetail() {
       try {
         const payload = await apiFetch<CourseDetailResponse>(`/api/v1/dashboard/student/course/${courseId}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${authToken}` },
           signal: controller.signal,
         });
         setData(payload);
         setPracticeResults({});
         setTutorResponses({});
+        fetchPersonalizedAndBundles(authToken, courseId);
       } catch (err: any) {
         if (err.name === "AbortError") return;
         setError(err.message ?? "Unable to load course details");
@@ -121,12 +169,56 @@ export default function StudentCourseDetailPage() {
     return () => controller.abort();
   }, [authLoading, authorized, courseId, router]);
 
+  async function fetchPersonalizedAndBundles(token: string, courseId: number) {
+    try {
+      const [personalizedResp, bundlesResp] = await Promise.all([
+        apiFetch<{ recommendations: PersonalizedRecommendation[] }>(
+          `/api/v1/recommendations/personalized?course_id=${courseId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
+        apiFetch<{ bundles: ContextBundle[] }>(
+          `/api/v1/recommendations/context-bundles?course_id=${courseId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
+      ]);
+      setPersonalizedRecs(personalizedResp.recommendations ?? []);
+      setBundles(bundlesResp.bundles ?? []);
+    } catch (err) {
+      console.error("Failed to load personalized content", err);
+    }
+  }
+
   const completedWeeks = useMemo(() => {
     if (!data) return 0;
     return data.weekly_progress.filter((week) => ["mastered", "proficient"].includes(week.status)).length;
   }, [data]);
 
   const totalWeeks = data?.weekly_progress.length ?? 0;
+
+  async function handleRateMaterial(materialId: number, rating: 1 | -1) {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    const authToken = token;
+    setRatingInFlight(materialId);
+    try {
+      await apiFetch(`/api/v1/materials/${materialId}/rate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ rating }),
+      });
+      const summary = await apiFetch<RatingSummary>(`/api/v1/materials/${materialId}/ratings/summary`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      setRatings((prev) => ({ ...prev, [materialId]: summary }));
+    } catch (err) {
+      console.error("Failed to rate material", err);
+    } finally {
+      setRatingInFlight(null);
+    }
+  }
 
   async function handleGenerateQuestions(weekNumber: number) {
     if (!data) return;
@@ -250,6 +342,103 @@ export default function StudentCourseDetailPage() {
           />
           <DetailStat label="Weak topics" value={data.weak_topics.length} subtext="Needs attention" variant={data.weak_topics.length ? "warning" : "default"} />
         </section>
+
+        <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <header className="flex flex-col gap-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Personalized feed</p>
+            <h2 className="text-lg font-semibold text-gray-900">AI picked for you</h2>
+            <p className="text-sm text-gray-500">Launch quick wins based on your mastery gaps.</p>
+          </header>
+          <div className="mt-5 space-y-4">
+            {personalizedRecs.length === 0 && (
+              <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No personalized recommendations yet—complete a few practice questions to get tailored suggestions.</p>
+            )}
+            {personalizedRecs.map((rec) => (
+              <div key={`${rec.material.id}-${rec.week_number}`} className="rounded-xl border border-gray-100 p-4">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{rec.material.title}</p>
+                      <p className="text-xs text-gray-500">Week {rec.week_number} · {rec.topic}</p>
+                    </div>
+                    <a href={rec.material.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-indigo-600">
+                      Open ↗
+                    </a>
+                  </div>
+                  <p className="text-xs text-gray-500">{rec.reasons.join(" ")} </p>
+                  <div className="flex items-center gap-4 text-xs text-gray-400">
+                    <span>Score {(rec.personalized_score * 100).toFixed(0)}%</span>
+                    <span>Similarity {(rec.similarity_score * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <button
+                      type="button"
+                      disabled={ratingInFlight === rec.material.id}
+                      className="rounded-md border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-indigo-200"
+                      onClick={() => handleRateMaterial(rec.material.id, 1)}
+                    >
+                      👍 Helpful
+                    </button>
+                    <button
+                      type="button"
+                      disabled={ratingInFlight === rec.material.id}
+                      className="rounded-md border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-rose-200"
+                      onClick={() => handleRateMaterial(rec.material.id, -1)}
+                    >
+                      👎 Not for me
+                    </button>
+                    {ratings[rec.material.id] && (
+                      <span className="text-xs text-gray-400">
+                        {ratings[rec.material.id].upvotes}↑ / {ratings[rec.material.id].downvotes}↓
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {bundles.length > 0 && (
+          <section className="rounded-2xl bg-white p-6 shadow-sm">
+            <header className="flex flex-col gap-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Study bundles</p>
+              <h2 className="text-lg font-semibold text-gray-900">Catch-up kits per week</h2>
+              <p className="text-sm text-gray-500">Each kit combines vetted resources to review the week quickly.</p>
+            </header>
+            <div className="mt-6 space-y-4">
+              {bundles.map((bundle) => (
+                <div key={`${bundle.week_number}-${bundle.topic}`} className="rounded-xl border border-gray-100 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        Week {bundle.week_number}: {bundle.topic}
+                      </p>
+                      <p className="text-xs text-gray-500">{bundle.summary}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {bundle.materials.map((material) => (
+                      <a
+                        key={material.id}
+                        href={material.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:border-indigo-200"
+                      >
+                        <span>
+                          <span className="font-medium text-gray-900">{material.title}</span>
+                          <span className="ml-2 text-xs uppercase text-gray-400">{material.source}</span>
+                        </span>
+                        <span className="text-xs text-gray-400">Launch ↗</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="rounded-2xl bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">

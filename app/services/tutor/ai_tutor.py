@@ -13,6 +13,8 @@ from app.models.course import Course
 from app.models.syllabus import Syllabus
 from app.services.tutor.rag_pipeline import RAGPipeline, ContextBuilder
 from app.services.tutor.answer_checker import AnswerChecker, QuestionType, GradingMode
+from app.services.processing.embedding_service import get_embedding_service
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +115,9 @@ Questions:"""
     def __init__(
         self,
         openai_api_key: Optional[str] = None,
-        model: str = "gpt-3.5-turbo"
+        model: Optional[str] = None,
+        use_openai: Optional[bool] = None,
+        rag_pipeline: Optional[RAGPipeline] = None
     ):
         """
         Initialize the AI Tutor.
@@ -121,15 +125,30 @@ Questions:"""
         Args:
             openai_api_key: OpenAI API key
             model: LLM model to use
+            use_openai: Force enable/disable OpenAI usage
+            rag_pipeline: Injected RAG pipeline (mainly for testing)
         """
-        self.api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
-        self.model = model
-        self.rag_pipeline = RAGPipeline()
+        self.use_openai = settings.USE_OPENAI_TUTOR if use_openai is None else use_openai
+        if self.use_openai:
+            self.api_key = openai_api_key or settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
+        else:
+            self.api_key = None
+
+        self.model = model or settings.AI_TUTOR_MODEL
+        self.rag_pipeline = rag_pipeline or RAGPipeline(
+            embedding_service=get_embedding_service(
+                model_name=settings.EMBEDDING_MODEL_NAME,
+                use_openai=settings.USE_OPENAI_EMBEDDINGS,
+                openai_api_key=settings.OPENAI_API_KEY
+            )
+        )
         self.answer_checker = AnswerChecker()
         self.llm_client = None
         
-        if self.api_key:
+        if self.use_openai and self.api_key:
             self._init_llm_client()
+        else:
+            logger.info("AI Tutor running in mock mode (OpenAI disabled or missing API key)")
     
     def _init_llm_client(self):
         """Initialize the LLM client."""

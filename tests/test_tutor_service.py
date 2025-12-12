@@ -370,6 +370,21 @@ class TestAITutor:
         assert result["is_correct"] == True
         assert result["score"] == 1
 
+    def test_init_mock_mode_when_openai_disabled(self):
+        """Tutor should stay in mock mode when OpenAI is disabled."""
+        with patch.object(AITutor, "_init_llm_client") as mock_init:
+            tutor = AITutor(openai_api_key="key", use_openai=False)
+            mock_init.assert_not_called()
+            assert tutor.api_key is None
+            assert tutor.llm_client is None
+
+    def test_init_openai_mode_initializes_client(self):
+        """Tutor should initialize OpenAI client when enabled and key present."""
+        with patch.object(AITutor, "_init_llm_client") as mock_init:
+            tutor = AITutor(openai_api_key="key", use_openai=True)
+            mock_init.assert_called_once()
+            assert tutor.api_key == "key"
+
 
 class TestGradingModes:
     """Tests for different grading modes."""

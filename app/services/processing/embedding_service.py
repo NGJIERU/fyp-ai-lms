@@ -7,6 +7,8 @@ import logging
 from typing import List, Optional, Union
 import numpy as np
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -294,19 +296,26 @@ _embedding_services: dict[tuple[str, bool, Optional[str]], EmbeddingService] = {
 
 
 def get_embedding_service(
-    model_name: str = "local_fast",
-    use_openai: bool = False,
+    model_name: Optional[str] = None,
+    use_openai: Optional[bool] = None,
     openai_api_key: Optional[str] = None
 ) -> EmbeddingService:
     """
     Get or create the embedding service singleton for a given configuration.
     """
     global _embedding_services
-    key = (model_name, use_openai, openai_api_key if use_openai else None)
+
+    resolved_model = model_name or settings.EMBEDDING_MODEL_NAME
+    resolved_use_openai = settings.USE_OPENAI_EMBEDDINGS if use_openai is None else use_openai
+    resolved_api_key = openai_api_key
+    if resolved_use_openai:
+        resolved_api_key = openai_api_key or settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
+
+    key = (resolved_model, resolved_use_openai, resolved_api_key if resolved_use_openai else None)
     if key not in _embedding_services:
         _embedding_services[key] = EmbeddingService(
-            model_name=model_name,
-            use_openai=use_openai,
-            openai_api_key=openai_api_key
+            model_name=resolved_model,
+            use_openai=resolved_use_openai,
+            openai_api_key=resolved_api_key
         )
     return _embedding_services[key]

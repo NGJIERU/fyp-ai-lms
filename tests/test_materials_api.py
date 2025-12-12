@@ -307,3 +307,111 @@ class TestMaterialsAPI:
         )
         # get_current_lecturer dependency should block
         assert response.status_code in (401, 403)
+
+    def test_student_can_rate_material(self, client: TestClient, db: Session):
+        """Test student can rate and update rating for a material."""
+        student = create_test_user(db, "stud_rate@test.com", "pass123", UserRole.STUDENT, "Student")
+        token = get_auth_token(client, "stud_rate@test.com", "pass123")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        material = Material(
+            title="Rateable Resource",
+            url="https://example.com/rate",
+            source="OER",
+            type="pdf",
+            content_hash="hash_rate"
+        )
+        db.add(material)
+        db.commit()
+        db.refresh(material)
+
+        payload = {"rating": 1, "note": "Great resource"}
+        response = client.post(
+            f"{settings.API_V1_STR}/materials/{material.id}/rate",
+            json=payload,
+            headers=headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["rating"] == 1
+        assert data["note"] == "Great resource"
+
+        payload_update = {"rating": -1, "note": "Actually not helpful"}
+        response = client.post(
+            f"{settings.API_V1_STR}/materials/{material.id}/rate",
+            json=payload_update,
+            headers=headers,
+        )
+        assert response.status_code == 200
+        updated = response.json()
+        assert updated["rating"] == -1
+        assert updated["note"] == "Actually not helpful"
+        assert updated["id"] == data["id"]
+
+    def test_lecturer_cannot_rate_material(self, client: TestClient, db: Session):
+        """Ensure lecturers cannot rate materials."""
+        lecturer = create_test_user(db, "lect_rate_forbid@test.com", "pass123", UserRole.LECTURER, "Lecturer")
+        token = get_auth_token(client, "lect_rate_forbid@test.com", "pass123")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        material = Material(
+            title="Lecturer Resource",
+            url="https://example.com/lect_rate",
+            source="Blog",
+            type="article",
+            content_hash="hash_lect_rate"
+        )
+        db.add(material)
+        db.commit()
+        db.refresh(material)
+
+        payload = {"rating": 1, "note": "Nice"}
+        response = client.post(
+            f"{settings.API_V1_STR}/materials/{material.id}/rate",
+            json=payload,
+            headers=headers,
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_material_rating_summary(self, client: TestClient, db: Session):
+        """Test rating summary aggregates upvotes/downvotes."""
+        student1 = create_test_user(db, "stud_summary1@test.com", "pass123", UserRole.STUDENT, "Student One")
+        student2 = create_test_user(db, "stud_summary2@test.com", "pass123", UserRole.STUDENT, "Student Two")
+        token1 = get_auth_token(client, "stud_summary1@test.com", "pass123")
+        token2 = get_auth_token(client, "stud_summary2@test.com", "pass123")
+        headers1 = {"Authorization": f"Bearer {token1}"}
+        headers2 = {"Authorization": f"Bearer {token2}"}
+
+        material = Material(
+            title="Summary Resource",
+            url="https://example.com/summary",
+            source="YouTube",
+            type="video",
+            content_hash="hash_summary"
+        )
+        db.add(material)
+        db.commit()
+        db.refresh(material)
+
+        client.post(
+            f"{settings.API_V1_STR}/materials/{material.id}/rate",
+            json={"rating": 1, "note": "Helpful"},
+            headers=headers1,
+        )
+        client.post(
+            f"{settings.API_V1_STR}/materials/{material.id}/rate",
+            json={"rating": -1, "note": "Not helpful"},
+            headers=headers2,
+        )
+
+        summary_response = client.get(
+            f"{settings.API_V1_STR}/materials/{material.id}/ratings/summary",
+            headers=headers1,
+        )
+        assert summary_response.status_code == 200
+        summary = summary_response.json()
+        assert summary["material_id"] == material.id
+        assert summary["total_ratings"] == 2
+        assert summary["upvotes"] == 1
+        assert summary["downvotes"] == 1
+        assert summary["average_rating"] == pytest.approx(0.0)

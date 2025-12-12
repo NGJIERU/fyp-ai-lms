@@ -211,3 +211,98 @@ def approve_material(
     topic_dict['course_name'] = result_topic.course.name if result_topic.course else None
     
     return schemas.material.MaterialTopicRead(**topic_dict)
+
+
+@router.post("/{material_id}/rate", response_model=schemas.material.MaterialRatingRead)
+def rate_material(
+    material_id: int,
+    rating_in: schemas.material.MaterialRatingCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    """
+    Allow students (or super admins) to rate a material with thumbs up/down.
+    """
+    if current_user.role not in [models.UserRole.STUDENT, models.UserRole.SUPER_ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can rate materials",
+        )
+
+    if rating_in.rating not in (-1, 1):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Rating must be -1 or 1",
+        )
+
+    material = db.query(models.Material).filter(models.Material.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    rating = (
+        db.query(models.MaterialRating)
+        .filter(
+            models.MaterialRating.material_id == material_id,
+            models.MaterialRating.student_id == current_user.id,
+        )
+        .first()
+    )
+
+    if rating:
+        rating.rating = rating_in.rating
+        rating.note = rating_in.note
+        rating.updated_at = datetime.utcnow()
+    else:
+        rating = models.MaterialRating(
+            material_id=material_id,
+            student_id=current_user.id,
+            rating=rating_in.rating,
+            note=rating_in.note,
+        )
+        db.add(rating)
+
+    db.commit()
+    db.refresh(rating)
+    return rating
+
+
+@router.get("/{material_id}/ratings/summary", response_model=schemas.material.MaterialRatingSummary)
+def get_material_rating_summary(
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    """
+    Return aggregate rating information for a material.
+    """
+    material = db.query(models.Material).filter(models.Material.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    ratings = (
+        db.query(models.MaterialRating)
+        .filter(models.MaterialRating.material_id == material_id)
+        .all()
+    )
+
+    total = len(ratings)
+    if total == 0:
+        return schemas.material.MaterialRatingSummary(
+            material_id=material_id,
+            average_rating=0.0,
+            total_ratings=0,
+            upvotes=0,
+            downvotes=0,
+        )
+
+    upvotes = sum(1 for r in ratings if r.rating == 1)
+    downvotes = total - upvotes
+    average = sum(r.rating for r in ratings) / total
+
+    return schemas.material.MaterialRatingSummary(
+        material_id=material_id,
+        average_rating=average,
+        total_ratings=total,
+        upvotes=upvotes,
+        downvotes=downvotes,
+    )

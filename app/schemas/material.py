@@ -121,3 +121,37 @@ class MaterialSearchResult(BaseModel):
     similarity_score: float
     relevance_score: Optional[float] = None
 
+
+class MaterialRatingBase(BaseModel):
+    rating: int = Field(..., description="Thumbs up (+1) or thumbs down (-1)", ge=-1, le=1)
+    note: Optional[str] = Field(None, max_length=1000, description="Optional note about the rating")
+
+
+class MaterialRatingCreate(MaterialRatingBase):
+    pass
+
+
+class MaterialRatingRead(MaterialRatingBase):
+    id: int
+    material_id: int
+    student_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MaterialRatingSummary(BaseModel):
+    material_id: int
+    average_rating: float
+    total_ratings: int
+    upvotes: int
+    downvotes: int
+
+
+class MaterialRatingInsight(MaterialRatingSummary):
+    title: str
+    course_id: int
+    course_name: Optional[str] = None
+

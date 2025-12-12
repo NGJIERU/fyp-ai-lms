@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.material import Material, MaterialTopic
 from app.models.syllabus import Syllabus
 from app.models.course import Course
+from app.models.performance import TopicPerformance
 from app.services.processing.embedding_service import EmbeddingService, get_embedding_service
 from app.services.processing.quality_scorer import QualityScorer, get_quality_scorer
 
@@ -28,6 +29,11 @@ class RecommendationEngine:
     MIN_SIMILARITY_THRESHOLD = 0.3
     MIN_QUALITY_THRESHOLD = 0.4
     
+    PERSONALIZATION_NEW_TOPIC_BOOST = 0.15
+    PERSONALIZATION_MAX_WEAKNESS_BOOST = 0.4
+    PERSONALIZATION_RECENCY_WEIGHT = 0.18
+    TARGET_MASTERY = 0.8
+
     def __init__(
         self,
         embedding_service: Optional[EmbeddingService] = None,
@@ -348,13 +354,15 @@ class RecommendationEngine:
             "content_text": material.content_text,
         }
         return self.embedding_service.embed_material(material_data)
-    
+
     def _calculate_combined_score(
         self,
         similarity: float,
         quality: float,
         similarity_weight: float = 0.6,
-        quality_weight: float = 0.4
+        quality_weight: float = 0.4,
+        rating_score: Optional[float] = None,
+        rating_weight: float = 0.15,
     ) -> float:
         """
         Calculate combined recommendation score.
@@ -364,11 +372,244 @@ class RecommendationEngine:
             quality: Material quality score
             similarity_weight: Weight for similarity
             quality_weight: Weight for quality
+            rating_score: Optional rating signal (0-1 range, 0.5 neutral)
+            rating_weight: Weight for rating signal
             
         Returns:
             Combined score (0.0 - 1.0)
         """
-        return (similarity * similarity_weight) + (quality * quality_weight)
+        base = (similarity * similarity_weight) + (quality * quality_weight)
+        if rating_score is not None:
+            neutral = 0.5  # neutral baseline
+            rating_adjustment = rating_score - neutral
+            base += rating_adjustment * rating_weight
+        return base
+
+    def _get_material_rating_score(self, material: Material) -> Optional[float]:
+        """
+        Convert material ratings into a 0-1 score.
+        Returns None if no ratings are available.
+        """
+        ratings = getattr(material, "ratings", None)
+        if not ratings:
+            return None
+
+        total = len(ratings)
+        if total == 0:
+            return None
+
+        avg = sum(r.rating for r in ratings) / total  # -1 to 1
+        normalized = (avg + 1) / 2  # 0 to 1
+
+        confidence = min(total / 5.0, 1.0)  # scale up to 5 ratings
+        return 0.5 + (normalized - 0.5) * confidence
+
+    def _get_student_topic_performance_map(
+        self,
+        db: Session,
+        student_id: int,
+        course_id: int
+    ) -> Dict[int, TopicPerformance]:
+        performances = (
+            db.query(TopicPerformance)
+            .filter(
+                TopicPerformance.student_id == student_id,
+                TopicPerformance.course_id == course_id
+            )
+            .all()
+        )
+        return {perf.week_number: perf for perf in performances}
+
+    def _apply_personalization(
+        self,
+        base_score: float,
+        performance: Optional[TopicPerformance],
+        now: datetime
+    ) -> Tuple[float, List[str]]:
+        adjusted_score = base_score
+        reasons: List[str] = []
+
+        if not performance:
+            adjusted_score += self.PERSONALIZATION_NEW_TOPIC_BOOST
+            reasons.append("No attempts recorded for this topic yet.")
+            return adjusted_score, reasons
+
+        avg_score = performance.average_score or 0.0
+        mastery_gap = max(0.0, self.TARGET_MASTERY - avg_score)
+
+        if performance.is_weak_topic or mastery_gap > 0.1:
+            gap_boost = min(
+                self.PERSONALIZATION_MAX_WEAKNESS_BOOST,
+                0.2 + mastery_gap * 0.5
+            )
+            adjusted_score += gap_boost
+            reasons.append(f"Weak topic (avg {(avg_score * 100):.0f}%).")
+
+        if performance.total_attempts == 0:
+            adjusted_score += self.PERSONALIZATION_NEW_TOPIC_BOOST / 2
+            reasons.append("Topic not attempted yet.")
+
+        if performance.last_attempt_at:
+            days_since = max(0, (now - performance.last_attempt_at).days)
+            recency_boost = self.PERSONALIZATION_RECENCY_WEIGHT / (1 + days_since / 3)
+            adjusted_score += recency_boost
+            if days_since == 0:
+                reasons.append("Recently practiced today.")
+            else:
+                reasons.append(f"Last practiced {days_since}d ago.")
+
+        return adjusted_score, reasons
+
+    def recommend_for_student(
+        self,
+        db: Session,
+        student_id: int,
+        course_id: int,
+        top_k: int = 10,
+        per_week: int = 3
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate personalized recommendations for a student by blending
+        similarity, material quality, and student performance signals.
+        """
+        syllabus_entries = (
+            db.query(Syllabus)
+            .filter(
+                Syllabus.course_id == course_id,
+                Syllabus.is_active == True
+            )
+            .order_by(Syllabus.week_number)
+            .all()
+        )
+
+        if not syllabus_entries:
+            return []
+
+        performance_map = self._get_student_topic_performance_map(db, student_id, course_id)
+        now = datetime.utcnow()
+        personalized_recs: List[Dict[str, Any]] = []
+        seen_material_ids = set()
+
+        for entry in syllabus_entries:
+            base_recs = self.recommend_for_topic(
+                db=db,
+                course_id=course_id,
+                week_number=entry.week_number,
+                top_k=per_week * 2,
+                exclude_approved=False
+            )
+
+            if not base_recs:
+                continue
+
+            perf = performance_map.get(entry.week_number)
+            for rec in base_recs:
+                material_id = rec["material_id"]
+
+                if material_id in seen_material_ids:
+                    continue
+
+                adjusted_score, reasons = self._apply_personalization(
+                    rec["combined_score"],
+                    perf,
+                    now
+                )
+
+                personalized_recs.append(
+                    {
+                        "course_id": course_id,
+                        "week_number": entry.week_number,
+                        "topic": entry.topic,
+                        "material": rec["material"],
+                        "material_id": material_id,
+                        "similarity_score": rec["similarity_score"],
+                        "quality_score": rec["quality_score"],
+                        "base_score": rec["combined_score"],
+                        "personalized_score": adjusted_score,
+                        "reasons": reasons,
+                    }
+                )
+                seen_material_ids.add(material_id)
+
+        personalized_recs.sort(key=lambda r: r["personalized_score"], reverse=True)
+        return personalized_recs[:top_k]
+
+    def _build_bundle_summary(self, topic: str, materials: List[Dict[str, Any]]) -> str:
+        """
+        Create a short summary for a bundle using top material titles.
+        """
+        titles = [m["material"]["title"] for m in materials if m.get("material")]
+        if not titles:
+            return f"Key resources curated for {topic}."
+
+        if len(titles) == 1:
+            return f"Focus on “{titles[0]}” to strengthen your understanding of {topic}."
+        joined_titles = ", ".join(f"“{title}”" for title in titles[:3])
+        return f"Review {joined_titles} to cover the core ideas for {topic}."
+
+    def generate_context_bundles(
+        self,
+        db: Session,
+        course_id: int,
+        max_bundles: int = 5,
+        materials_per_bundle: int = 3,
+        include_scores: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate study bundles per week combining top recommendations with a short summary.
+        """
+        syllabus_entries = (
+            db.query(Syllabus)
+            .filter(
+                Syllabus.course_id == course_id,
+                Syllabus.is_active == True
+            )
+            .order_by(Syllabus.week_number)
+            .all()
+        )
+
+        bundles: List[Dict[str, Any]] = []
+        for entry in syllabus_entries:
+            recs = self.recommend_for_topic(
+                db=db,
+                course_id=course_id,
+                week_number=entry.week_number,
+                top_k=materials_per_bundle,
+                exclude_approved=False
+            )
+            if not recs:
+                continue
+
+            summary = self._build_bundle_summary(entry.topic, recs)
+            bundle_materials = []
+            for rec in recs:
+                material_data = {
+                    "id": rec["material"]["id"],
+                    "title": rec["material"]["title"],
+                    "url": rec["material"]["url"],
+                    "source": rec["material"]["source"],
+                    "type": rec["material"]["type"],
+                }
+                if include_scores:
+                    material_data["similarity_score"] = rec["similarity_score"]
+                    material_data["quality_score"] = rec["quality_score"]
+                bundle_materials.append(material_data)
+
+            bundles.append(
+                {
+                    "course_id": course_id,
+                    "week_number": entry.week_number,
+                    "topic": entry.topic,
+                    "summary": summary,
+                    "materials": bundle_materials,
+                }
+            )
+
+            if len(bundles) >= max_bundles:
+                break
+
+        return bundles
+
     
     def update_material_embeddings(
         self,

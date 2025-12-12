@@ -30,6 +30,7 @@ class Material(Base):
 
     # Relationships
     topics = relationship("MaterialTopic", back_populates="material", cascade="all, delete-orphan")
+    ratings = relationship("MaterialRating", back_populates="material", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('ix_materials_type', 'type'),
@@ -66,6 +67,26 @@ class MaterialTopic(Base):
         Index('ix_material_topics_material', 'material_id'),
         CheckConstraint('week_number BETWEEN 1 AND 14', name='check_material_topic_week_range'),
         CheckConstraint('relevance_score >= 0.0 AND relevance_score <= 1.0', name='check_relevance_score_range'),
+    )
+
+
+class MaterialRating(Base):
+    __tablename__ = "material_ratings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    material_id = Column(Integer, ForeignKey("materials.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    rating = Column(Integer, nullable=False)  # -1 or +1
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    material = relationship("Material", back_populates="ratings")
+    student = relationship("User")
+
+    __table_args__ = (
+        Index('ix_material_ratings_material_student', 'material_id', 'student_id', unique=True),
+        CheckConstraint('rating IN (-1, 1)', name='check_material_rating_value'),
     )
 
 

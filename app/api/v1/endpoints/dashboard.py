@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from app import models
 from app.api import deps
 from app.core.database import get_db
+from app.services.recommendation import get_recommendation_engine
 
 router = APIRouter()
 
@@ -85,6 +86,33 @@ class LecturerCourseStats(BaseModel):
     pending_approvals: int
 
 
+class LecturerBundleMaterial(BaseModel):
+    id: int
+    title: str
+    url: str
+    source: str
+    type: str
+
+
+class LecturerBundleItem(BaseModel):
+    course_id: int
+    week_number: int
+    topic: str
+    summary: str
+    materials: List[LecturerBundleMaterial]
+
+
+class RatingInsightItem(BaseModel):
+    material_id: int
+    title: str
+    course_id: int
+    course_name: Optional[str]
+    average_rating: float
+    total_ratings: int
+    upvotes: int
+    downvotes: int
+
+
 class StudentPerformanceItem(BaseModel):
     student_id: int
     student_name: str
@@ -109,6 +137,8 @@ class LecturerDashboardResponse(BaseModel):
     total_students: int
     pending_material_approvals: int
     recent_submissions: List[Dict[str, Any]]
+    context_bundles: List[LecturerBundleItem] = []
+    rating_insights: List[RatingInsightItem] = []
 
 
 # ==================== Student Dashboard Endpoints ====================
