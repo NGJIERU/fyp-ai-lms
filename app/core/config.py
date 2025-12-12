@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     USE_OPENAI_TUTOR: bool = False
     USE_OPENAI_EMBEDDINGS: bool = False
     EMBEDDING_MODEL_NAME: str = "local_fast"
+    BACKEND_CORS_ORIGINS: List[str] = []
 
     class Config:
         case_sensitive = True

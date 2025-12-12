@@ -24,6 +24,33 @@ type Submission = {
   attempted_at?: string | null;
 };
 
+type LecturerBundleMaterial = {
+  id: number;
+  title: string;
+  url: string;
+  source: string;
+  type: string;
+};
+
+type LecturerBundleItem = {
+  course_id: number;
+  week_number: number;
+  topic: string;
+  summary: string;
+  materials: LecturerBundleMaterial[];
+};
+
+type RatingInsightItem = {
+  material_id: number;
+  title: string;
+  course_id: number;
+  course_name?: string | null;
+  average_rating: number;
+  total_ratings: number;
+  upvotes: number;
+  downvotes: number;
+};
+
 type LecturerDashboardResponse = {
   lecturer_id: number;
   lecturer_name: string;
@@ -31,6 +58,8 @@ type LecturerDashboardResponse = {
   total_students: number;
   pending_material_approvals: number;
   recent_submissions: Submission[];
+  context_bundles: LecturerBundleItem[];
+  rating_insights: RatingInsightItem[];
 };
 
 export default function LecturerDashboardPage() {
@@ -151,29 +180,110 @@ export default function LecturerDashboardPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">Recent submissions</h2>
-            <div className="mt-4 space-y-4">
-              {data.recent_submissions.length === 0 && (
-                <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
-                  No recent submissions.
-                </p>
-              )}
-              {data.recent_submissions.map((submission, index) => (
-                <div key={`${submission.student_id}-${index}`} className="rounded-lg border border-gray-100 p-4">
-                  <p className="text-sm font-medium text-gray-900">
-                    Student #{submission.student_id} · Week {submission.week_number}
+          <section className="flex flex-col gap-4 rounded-2xl bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Recent submissions</h2>
+              <div className="mt-4 space-y-4">
+                {data.recent_submissions.length === 0 && (
+                  <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
+                    No recent submissions.
                   </p>
-                  <p className="text-xs text-gray-500">
-                    Course #{submission.course_id} · Score {submission.score?.toFixed(1) ?? "-"}%
+                )}
+                {data.recent_submissions.map((submission, index) => (
+                  <div key={`${submission.student_id}-${index}`} className="rounded-lg border border-gray-100 p-4">
+                    <p className="text-sm font-medium text-gray-900">
+                      Student #{submission.student_id} · Week {submission.week_number}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Course #{submission.course_id} · Score {submission.score?.toFixed(1) ?? "-"}%
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {submission.attempted_at
+                        ? new Date(submission.attempted_at).toLocaleString()
+                        : "Timestamp unavailable"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Study bundles</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                AI-curated kits per week, built from your approved materials.
+              </p>
+              <div className="mt-4 space-y-3">
+                {data.context_bundles.length === 0 && (
+                  <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+                    No bundles yet. Approve materials and generate recommendations to see kits here.
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {submission.attempted_at
-                      ? new Date(submission.attempted_at).toLocaleString()
-                      : "Timestamp unavailable"}
+                )}
+                {data.context_bundles.map((bundle, index) => {
+                  const course = data.courses.find((c) => c.course_id === bundle.course_id);
+                  return (
+                    <div
+                      key={`${bundle.course_id}-${bundle.week_number}-${index}`}
+                      className="rounded-lg border border-gray-100 p-3"
+                    >
+                      <p className="text-xs uppercase tracking-wide text-indigo-600">
+                        {course?.course_code} · {course?.course_name}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900">
+                        Week {bundle.week_number}: {bundle.topic}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 line-clamp-2">{bundle.summary}</p>
+                      <div className="mt-2 space-y-1">
+                        {bundle.materials.map((mat) => (
+                          <a
+                            key={mat.id}
+                            href={mat.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-between rounded-md border border-gray-100 px-2 py-1 text-[0.7rem] text-gray-700 hover:border-indigo-200"
+                          >
+                            <span className="truncate">
+                              <span className="font-medium text-gray-900">{mat.title}</span>
+                              <span className="ml-1 text-[0.6rem] uppercase text-gray-400">{mat.source}</span>
+                            </span>
+                            <span className="text-[0.6rem] text-gray-400">Open ↗</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Low-rated materials</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Resources students consistently downvote across your courses.
+              </p>
+              <div className="mt-4 space-y-3">
+                {data.rating_insights.length === 0 && (
+                  <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+                    No rating insights yet. Students haven&apos;t rated enough materials.
                   </p>
-                </div>
-              ))}
+                )}
+                {data.rating_insights.map((insight) => (
+                  <div
+                    key={insight.material_id}
+                    className="rounded-lg border border-gray-100 p-3 text-xs"
+                  >
+                    <p className="font-semibold text-gray-900 truncate">{insight.title}</p>
+                    <p className="text-gray-500">
+                      {insight.course_name ?? `Course #${insight.course_id}`} · {insight.upvotes}↑ / {insight.downvotes}↓ ({
+                        insight.total_ratings
+                      }{" "}
+                      ratings)
+                    </p>
+                    <p className="mt-1 text-[0.65rem] text-gray-400">
+                      Avg rating: {insight.average_rating.toFixed(2)} (−1 to +1)
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
         </div>

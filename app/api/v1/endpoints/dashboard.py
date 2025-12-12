@@ -7,6 +7,7 @@ from sqlalchemy import func, desc
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 from app import models
 from app.api import deps
@@ -490,7 +491,7 @@ def get_lecturer_dashboard(
         .all()
     )
     
-    course_stats = []
+    course_stats: List[LecturerCourseStats] = []
     total_students = 0
     total_pending = 0
     
@@ -565,14 +566,109 @@ def get_lecturer_dashboard(
         }
         for s in recent_submissions
     ]
-    
+
+    # Context bundles per course (limited for dashboard view)
+    engine = get_recommendation_engine()
+    context_bundles: List[LecturerBundleItem] = []
+    for course in courses:
+        bundles = engine.generate_context_bundles(
+            db=db,
+            course_id=course.id,
+            max_bundles=2,
+            materials_per_bundle=3,
+            include_scores=False,
+        )
+        for bundle in bundles:
+            materials = [
+                LecturerBundleMaterial(
+                    id=m["id"],
+                    title=m["title"],
+                    url=m["url"],
+                    source=m["source"],
+                    type=m["type"],
+                )
+                for m in bundle.get("materials", [])
+            ]
+            context_bundles.append(
+                LecturerBundleItem(
+                    course_id=bundle["course_id"],
+                    week_number=bundle["week_number"],
+                    topic=bundle["topic"],
+                    summary=bundle["summary"],
+                    materials=materials,
+                )
+            )
+
+    # Rating insights: identify lowest-rated materials across lecturer's courses
+    rating_insights: List[RatingInsightItem] = []
+    ratings = (
+        db.query(models.MaterialRating)
+        .join(models.Material, models.MaterialRating.material_id == models.Material.id)
+        .outerjoin(
+            models.MaterialTopic,
+            models.MaterialTopic.material_id == models.Material.id,
+        )
+        .outerjoin(
+            models.Course,
+            models.MaterialTopic.course_id == models.Course.id,
+        )
+        .filter(models.Course.lecturer_id == current_user.id)
+        .all()
+    )
+
+    grouped: Dict[int, Dict[str, Any]] = defaultdict(
+        lambda: {"ratings": [], "material": None, "course": None}
+    )
+    for r in ratings:
+        mat = r.material
+        # Find any associated course via topics owned by this lecturer
+        topic = None
+        for t in mat.topics:
+            if t.course.lecturer_id == current_user.id:
+                topic = t
+                break
+        course = topic.course if topic else None
+        entry = grouped[mat.id]
+        entry["ratings"].append(r.rating)
+        entry["material"] = mat
+        entry["course"] = course
+
+    MIN_RATINGS = 3
+    for material_id, info in grouped.items():
+        vals = info["ratings"]
+        if len(vals) < MIN_RATINGS:
+            continue
+        mat = info["material"]
+        course = info["course"]
+        avg = sum(vals) / len(vals)
+        upvotes = sum(1 for v in vals if v == 1)
+        downvotes = sum(1 for v in vals if v == -1)
+        rating_insights.append(
+            RatingInsightItem(
+                material_id=material_id,
+                title=mat.title,
+                course_id=course.id if course else 0,
+                course_name=course.name if course else None,
+                average_rating=avg,
+                total_ratings=len(vals),
+                upvotes=upvotes,
+                downvotes=downvotes,
+            )
+        )
+
+    # Sort to show worst-rated first and limit list
+    rating_insights.sort(key=lambda r: r.average_rating)
+    rating_insights = rating_insights[:10]
+
     return LecturerDashboardResponse(
         lecturer_id=current_user.id,
         lecturer_name=current_user.full_name or current_user.email,
         courses=course_stats,
         total_students=total_students,
         pending_material_approvals=total_pending,
-        recent_submissions=submissions_list
+        recent_submissions=submissions_list,
+        context_bundles=context_bundles,
+        rating_insights=rating_insights,
     )
 
 
