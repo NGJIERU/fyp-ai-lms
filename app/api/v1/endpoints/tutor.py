@@ -54,6 +54,8 @@ class CheckAnswerRequest(BaseModel):
     question: Dict[str, Any] = Field(..., description="Question data with correct answer")
     student_answer: str
     mode: GradingModeEnum = GradingModeEnum.practice
+    course_id: int = Field(..., description="ID of the course")
+    week_number: int = Field(..., description="Week number for the topic")
 
 
 class CheckAnswerResponse(BaseModel):
@@ -190,6 +192,10 @@ def check_answer(
     """
     tutor = get_ai_tutor()
     result = tutor.check_answer(
+        db=db,
+        student_id=current_user.id,
+        course_id=request.course_id,
+        week_number=request.week_number,
         question_type=request.question_type.value,
         question=request.question,
         student_answer=request.student_answer,
@@ -356,19 +362,23 @@ def chat_with_tutor(
     
     tutor = get_ai_tutor()
     
-    # For chat, we use the explain functionality with the message as the question
-    result = tutor.explain_concept(
+    # Convert Pydantic models to dicts for the service
+    history = None
+    if request.conversation_history:
+        history = [msg.dict() for msg in request.conversation_history]
+    
+    result = tutor.chat(
         db=db,
         course_id=course_id,
-        topic=request.message,  # Use message as topic/query
-        question=None,
+        message=request.message,
+        conversation_history=history,
         week_number=request.week_number
     )
     
     return ChatResponse(
-        response=result.get("explanation", "I couldn't generate a response."),
+        response=result.get("response", "I couldn't generate a response."),
         sources=result.get("sources", []),
-        suggested_topics=None  # Could be populated based on context
+        suggested_topics=result.get("suggested_topics", [])
     )
 
 
@@ -431,6 +441,43 @@ def check_mcq_answer(
         explanation=result.get("explanation") if mode == GradingModeEnum.practice else None,
         score=result.get("score", 0)
     )
+
+
+@router.get("/practice/history", response_model=List[Dict[str, Any]])
+def get_practice_history(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
+):
+    """
+    Get practice history for a student in a course.
+    """
+    from app.models.performance import QuizAttempt
+    
+    attempts = (
+        db.query(QuizAttempt)
+        .filter(
+            QuizAttempt.student_id == current_user.id,
+            QuizAttempt.course_id == course_id
+        )
+        .order_by(QuizAttempt.attempted_at.desc())
+        .limit(50)
+        .all()
+    )
+    
+    return [
+        {
+            "id": a.id,
+            "week_number": a.week_number,
+            "score": a.score,
+            "max_score": a.max_score,
+            "is_correct": a.is_correct,
+            "attempted_at": a.attempted_at,
+            "question_type": a.question_type,
+            "question_preview": a.question_data.get("question") if a.question_data else "Question"
+        }
+        for a in attempts
+    ]
 
 
 # Code execution endpoint

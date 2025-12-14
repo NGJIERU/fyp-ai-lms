@@ -320,13 +320,23 @@ export default function StudentCourseDetailPage() {
           <Link href="/student/dashboard" className="text-sm font-medium text-indigo-600">
             ← Back to dashboard
           </Link>
-          <p className="text-sm uppercase tracking-wide text-indigo-600">Course focus</p>
-          <h1 className="text-3xl font-semibold text-gray-900">
-            {data.course_name}
-            <span className="ml-3 rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">
-              {data.course_code}
-            </span>
-          </h1>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-wide text-indigo-600">Course focus</p>
+              <h1 className="text-3xl font-semibold text-gray-900">
+                {data.course_name}
+                <span className="ml-3 rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">
+                  {data.course_code}
+                </span>
+              </h1>
+            </div>
+            <Link
+              href={`/student/course/${courseId}/chat`}
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+            >
+              <span>💬</span> Start Full Chat
+            </Link>
+          </div>
           <p className="text-sm text-gray-500">
             {data.lecturer_name ? `Led by ${data.lecturer_name}.` : "Lecturer TBD."} Track your mastery week by week.
           </p>
@@ -342,6 +352,15 @@ export default function StudentCourseDetailPage() {
           />
           <DetailStat label="Weak topics" value={data.weak_topics.length} subtext="Needs attention" variant={data.weak_topics.length ? "warning" : "default"} />
         </section>
+
+        <div className="flex justify-end">
+          <Link
+            href={`/student/course/${courseId}/practice`}
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+          >
+            View detailed practice analytics →
+          </Link>
+        </div>
 
         <section className="rounded-2xl bg-white p-6 shadow-sm">
           <header className="flex flex-col gap-1">

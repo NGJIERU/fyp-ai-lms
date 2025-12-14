@@ -109,7 +109,30 @@ Generate {num_questions} practice questions that:
 3. Are appropriate for the specified difficulty level
 4. Have clear, unambiguous answers
 
-Questions:"""
+Questions:""",
+
+        "chat": """You are an AI Personal Tutor having a conversation with a student.
+Your goal is to be helpful, encouraging, and educational.
+
+Course: {course_name}
+Topic context (based on current discussion): {topic}
+
+Relevant Course Materials:
+{context}
+
+Conversation History:
+{history}
+
+Student's new message: {message}
+
+Guidelines:
+1. Answer the student's question using the provided course materials.
+2. If the answer isn't in the materials, use your general knowledge but mention that it's general info.
+3. Be concise but thorough.
+4. Encourage critical thinking - if they ask for an answer, guide them instead of just giving it (unless it's a simple fact).
+5. Maintain a friendly, supportive tone.
+
+Response:"""
     }
     
     def __init__(
@@ -205,42 +228,187 @@ Questions:"""
         return {
             "explanation": explanation,
             "topic": topic,
-            "sources": [
-                {"title": c["title"], "url": c["url"], "source": c["source"]}
-                for c in context_chunks
-            ],
+            "sources": [{"title": c.get("title", "Unknown"), "source": c.get("source", "Unknown")} for c in context_chunks],
             "course_id": course_id,
             "week_number": week_number
         }
     
+    def chat(
+        self,
+        db: Session,
+        course_id: int,
+        message: str,
+        conversation_history: List[Dict[str, str]] = None,
+        week_number: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Have a multi-turn conversation with the tutor.
+        
+        Args:
+            db: Database session
+            course_id: Course ID
+            message: Current user message
+            conversation_history: List of {"role": "user"|"assistant", "content": "..."}
+            week_number: Optional week context
+            
+        Returns:
+            Response with sources
+        """
+        # Get course name for context
+        course = db.query(Course).filter(Course.id == course_id).first()
+        course_name = course.name if course else "Unknown Course"
+        
+        # Format history for prompt
+        history_str = ""
+        if conversation_history:
+            # Limit history to last 6 messages to save tokens
+            recent_history = conversation_history[-6:]
+            for msg in recent_history:
+                role = msg.get("role", "user").capitalize()
+                content = msg.get("content", "")
+                history_str += f"{role}: {content}\n"
+        
+        # Retrieve context based on the current message (and maybe last message for context)
+        # Using just current message for query is usually sufficient for RAG if message represents the intent
+        context_chunks = self.rag_pipeline.retrieve_context(
+            db=db,
+            query=message,
+            course_id=course_id,
+            week_number=week_number,
+            top_k=5
+        )
+        
+        context_str = self.rag_pipeline.build_prompt_context(context_chunks)
+        
+        # Generate response
+        prompt = self.PROMPTS["chat"].format(
+            course_name=course_name,
+            topic=message, # Using message as loose topic proxy
+            context=context_str,
+            history=history_str,
+            message=message
+        )
+        
+        response = self._call_llm(prompt)
+        
+        return {
+            "response": response,
+            "sources": [
+                {"title": c["title"], "url": c["url"], "source": c["source"]}
+                for c in context_chunks
+            ],
+            "suggested_topics": [] # Could implement suggestion logic later
+        }
+    
     def check_answer(
         self,
+        db: Session,
+        student_id: int,
+        course_id: int,
+        week_number: int,
         question_type: str,
         question: Dict[str, Any],
         student_answer: str,
         mode: str = "practice"
     ) -> Dict[str, Any]:
         """
-        Check a student's answer.
+        Check a student's answer and record performance.
         
         Args:
-            question_type: Type of question (mcq, short_text, python_code, step_by_step)
+            db: Database session
+            student_id: Student ID
+            course_id: Course ID
+            week_number: Week number
+            question_type: Type of question
             question: Question data
             student_answer: Student's answer
-            mode: Grading mode (practice or graded)
+            mode: Grading mode
             
         Returns:
             Grading result with feedback
         """
+        from app.models.performance import QuizAttempt, TopicPerformance
+        
         q_type = QuestionType(question_type)
         g_mode = GradingMode(mode)
         
-        return self.answer_checker.check_answer(
+        # 1. Check answer using logic
+        result = self.answer_checker.check_answer(
             question_type=q_type,
             question=question,
             student_answer=student_answer,
             mode=g_mode
         )
+        
+        # 2. Record attempt
+        attempt = QuizAttempt(
+            student_id=student_id,
+            course_id=course_id,
+            week_number=week_number,
+            question_type=question_type,
+            question_data=question,
+            student_answer=student_answer,
+            score=result.get("score", 0),
+            max_score=result.get("max_score", 1),
+            is_correct=result.get("is_correct", False),
+            feedback=result.get("feedback"),
+            mode=mode
+        )
+        db.add(attempt)
+        
+        # 3. Update aggregated Topic Performance
+        topic_perf = (
+            db.query(TopicPerformance)
+            .filter(
+                TopicPerformance.student_id == student_id,
+                TopicPerformance.course_id == course_id,
+                TopicPerformance.week_number == week_number
+            )
+            .first()
+        )
+        
+        if not topic_perf:
+            topic_perf = TopicPerformance(
+                student_id=student_id,
+                course_id=course_id,
+                week_number=week_number,
+                total_attempts=0,
+                correct_attempts=0,
+                average_score=0.0
+            )
+            db.add(topic_perf)
+        
+        # Update stats
+        old_total = topic_perf.total_attempts
+        new_total = old_total + 1
+        
+        current_score_pct = (result.get("score", 0) / result.get("max_score", 1)) * 100
+        new_avg = ((topic_perf.average_score * old_total) + current_score_pct) / new_total
+        
+        topic_perf.total_attempts = new_total
+        if result.get("is_correct", False):
+            topic_perf.correct_attempts += 1
+        
+        topic_perf.average_score = new_avg
+        topic_perf.last_attempt_at = datetime.utcnow()
+        
+        # Determine mastery/weakness
+        if new_avg < 60 and new_total >= 3:
+            topic_perf.is_weak_topic = True
+            topic_perf.mastery_level = "remedial"
+        elif new_avg >= 85 and new_total >= 3:
+            topic_perf.is_weak_topic = False
+            topic_perf.mastery_level = "mastered"
+        elif new_avg >= 70:
+            topic_perf.is_weak_topic = False
+            topic_perf.mastery_level = "proficient"
+        else:
+            topic_perf.mastery_level = "learning"
+            
+        db.commit()
+        db.refresh(attempt)
+        
+        return result
     
     def provide_hint(
         self,
@@ -408,20 +576,65 @@ Questions:"""
         Returns:
             List of weak topics with recommendations
         """
-        # This would typically query a student_performance table
-        # For now, return a placeholder structure
+        from app.models.performance import TopicPerformance
+        from app.models.syllabus import Syllabus
+        from app.models.material import Material
         
-        # TODO: Implement actual performance tracking
-        # Query student's quiz/assignment results
-        # Aggregate scores by topic/week
-        # Identify topics below threshold
+        # Find topics flagged as weak
+        weak_perfs = (
+            db.query(TopicPerformance)
+            .filter(
+                TopicPerformance.student_id == student_id,
+                TopicPerformance.course_id == course_id,
+                TopicPerformance.is_weak_topic == True
+            )
+            .all()
+        )
+        
+        results = []
+        recommendations = set()
+        
+        for perf in weak_perfs:
+            # Get topic name
+            syllabus = (
+                db.query(Syllabus)
+                .filter(
+                    Syllabus.course_id == course_id, 
+                    Syllabus.week_number == perf.week_number
+                )
+                .first()
+            )
+            topic_name = syllabus.topic if syllabus else f"Week {perf.week_number}"
+            
+            results.append({
+                "topic": topic_name,
+                "week_number": perf.week_number,
+                "score": perf.average_score,
+                "attempts": perf.total_attempts
+            })
+            
+            # Find recommended materials for this weak topic via MaterialTopic
+            from app.models.material import MaterialTopic
+            material_topics = (
+                db.query(MaterialTopic)
+                .filter(
+                    MaterialTopic.course_id == course_id,
+                    MaterialTopic.week_number == perf.week_number,
+                    MaterialTopic.approved_by_lecturer == True
+                )
+                .limit(2)
+                .all()
+            )
+            for mt in material_topics:
+                if mt.material:
+                    recommendations.add(mt.material.title)
         
         return {
             "student_id": student_id,
             "course_id": course_id,
-            "weak_topics": [],
-            "recommendations": [],
-            "message": "Performance tracking not yet implemented"
+            "weak_topics": results,
+            "recommendations": list(recommendations),
+            "message": "Analysis based on practice performance"
         }
     
     def get_revision_suggestions(
@@ -494,6 +707,13 @@ Key points:
 
 For a complete explanation, please ensure the OpenAI API key is configured."""
         
+        elif "chat" in prompt.lower() or "conversation" in prompt.lower():
+            return """Hello! I'm your AI Tutor. Since I'm running in mock mode, I can't generate a dynamic response based on your specific question about the course materials. 
+
+In a real deployment, I would use the RAG pipeline to find relevant content from your course documents and answer: "{}" 
+
+How else can I help you today?""".format(prompt[-50:].replace("\n", " "))
+
         elif "hint" in prompt.lower():
             return "Consider reviewing the fundamental concepts related to this problem. Think about what approach might work best given the constraints."
         
