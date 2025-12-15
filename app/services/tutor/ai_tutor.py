@@ -721,11 +721,19 @@ How else can I help you today?""".format(prompt[-50:].replace("\n", " "))
             return "This is a mock summary. The actual summary would condense the key points from the material into a concise review format."
         
         elif "question" in prompt.lower():
-            return """1. What is the main concept discussed in this topic?
-2. How does this concept apply to real-world scenarios?
-3. What are the key differences between related approaches?
-4. Explain the process step by step.
-5. What are the advantages and limitations?"""
+            # Extract topic if possible
+            topic = "this topic"
+            if "Topic:" in prompt:
+                try:
+                    topic = prompt.split("Topic:")[1].split("\n")[0].strip()
+                except:
+                    pass
+            
+            return f"""1. What are the core principles of {{topic}}?
+2. Explain how {{topic}} applies to real-world scenarios.
+3. Compare and contrast different approaches within {{topic}}.
+4. Describe the step-by-step process involved in {{topic}}.
+5. What are the common challenges when working with {{topic}}?""".format(topic=topic)
         
         return "Mock response - LLM not configured."
     

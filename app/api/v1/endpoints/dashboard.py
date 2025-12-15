@@ -63,6 +63,7 @@ class StudentDashboardResponse(BaseModel):
     recent_activity: List[Dict[str, Any]]
     weak_topics_summary: Dict[str, int]  # course_id -> count
     total_study_time_hours: float
+    total_study_time_seconds: int = 0
 
 
 class CourseDetailResponse(BaseModel):
@@ -73,6 +74,9 @@ class CourseDetailResponse(BaseModel):
     weekly_progress: List[WeeklyProgressItem]
     weak_topics: List[WeakTopicItem]
     overall_score: float
+    total_attempts: int = 0  # Total quiz attempts (for UX: hide score if < 3)
+    weeks_attempted: int = 0  # Weeks with any attempts (distinguished from completed)
+    weeks_completed: int = 0  # Weeks with mastery >= 70%
     materials_accessed: int
     total_materials: int
 
@@ -258,7 +262,8 @@ def get_student_dashboard(
         enrolled_courses=enrolled_courses,
         recent_activity=activity_list,
         weak_topics_summary=weak_topics_summary,
-        total_study_time_hours=round(total_hours, 1)
+        total_study_time_hours=round(total_hours, 1),
+        total_study_time_seconds=int(sessions or 0)
     )
 
 
@@ -388,14 +393,16 @@ def get_student_course_detail(
         lecturer = db.query(models.User).filter(models.User.id == course.lecturer_id).first()
         lecturer_name = lecturer.full_name if lecturer else None
     
-    # Count materials accessed
+    # Count materials accessed (distinct materials viewed in this course)
     materials_accessed = (
-        db.query(models.ActivityLog)
+        db.query(models.ActivityLog.resource_id)
         .filter(
             models.ActivityLog.user_id == current_user.id,
             models.ActivityLog.action == "view_material",
-            models.ActivityLog.resource_type == "material"
+            models.ActivityLog.resource_type == "material",
+            models.ActivityLog.course_id == course_id  # Filter by course
         )
+        .distinct()
         .count()
     )
     
@@ -408,7 +415,27 @@ def get_student_course_detail(
         .count()
     )
     
-    overall_score = (total_score / scored_weeks * 100) if scored_weeks > 0 else 0
+    overall_score = (total_score / scored_weeks) if scored_weeks > 0 else 0
+    
+    # Calculate aggregate stats for UX
+    total_attempts = (
+        db.query(func.sum(models.TopicPerformance.total_attempts))
+        .filter(
+            models.TopicPerformance.student_id == current_user.id,
+            models.TopicPerformance.course_id == course_id
+        )
+        .scalar() or 0
+    )
+    
+    weeks_completed = (
+        db.query(models.TopicPerformance)
+        .filter(
+            models.TopicPerformance.student_id == current_user.id,
+            models.TopicPerformance.course_id == course_id,
+            models.TopicPerformance.mastery_level.in_(["proficient", "mastered"])
+        )
+        .count()
+    )
     
     return CourseDetailResponse(
         course_id=course.id,
@@ -418,6 +445,9 @@ def get_student_course_detail(
         weekly_progress=weekly_progress,
         weak_topics=weak_topics,
         overall_score=round(overall_score, 1),
+        total_attempts=int(total_attempts),
+        weeks_attempted=scored_weeks,  # scored_weeks = weeks with any performance data
+        weeks_completed=weeks_completed,
         materials_accessed=materials_accessed,
         total_materials=total_materials
     )

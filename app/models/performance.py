@@ -149,6 +149,7 @@ class ActivityLog(Base):
     action = Column(String(100), nullable=False)  # login, view_material, submit_quiz, etc.
     resource_type = Column(String(50), nullable=True)  # course, material, quiz, etc.
     resource_id = Column(Integer, nullable=True)
+    course_id = Column(Integer, ForeignKey("courses.id", ondelete="SET NULL"), nullable=True, index=True)  # Course context for analytics
     extra_data = Column(JSON, nullable=True)  # Additional action-specific data
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(String(255), nullable=True)

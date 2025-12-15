@@ -40,6 +40,9 @@ type CourseDetailResponse = {
   weekly_progress: WeeklyProgress[];
   weak_topics: WeakTopicItem[];
   overall_score: number;
+  total_attempts: number;   // For UX: hide score if < 3
+  weeks_attempted: number;  // Weeks with any quiz attempts
+  weeks_completed: number;  // Weeks with mastery >= 70%
   materials_accessed: number;
   total_materials: number;
 };
@@ -220,6 +223,28 @@ export default function StudentCourseDetailPage() {
     }
   }
 
+  function handleMaterialClick(materialId: number, resourceType: string = "material") {
+    // Fire and forget logging
+    const token = localStorage.getItem("access_token");
+    if (!token || !data) return;
+
+    // Use direct fetch (not async/await since we don't wait for result)
+    fetch("http://localhost:8000/api/v1/analytics/log", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        action: "view_material",
+        resource_type: resourceType,
+        resource_id: materialId,
+        course_id: data.course_id,  // Include course context
+      }),
+      keepalive: true, // Ensures request completes even if page unloads
+    }).catch(() => { }); // Silently ignore errors
+  }
+
   async function handleGenerateQuestions(weekNumber: number) {
     if (!data) return;
     const token = localStorage.getItem("access_token");
@@ -343,8 +368,18 @@ export default function StudentCourseDetailPage() {
         </div>
 
         <section className="grid gap-4 md:grid-cols-4">
-          <DetailStat label="Overall score" value={`${data.overall_score.toFixed(1)}%`} subtext="Across completed weeks" />
-          <DetailStat label="Weeks completed" value={`${completedWeeks}/${totalWeeks}`} subtext="Proficient or mastered" />
+          <DetailStat
+            label="Overall score"
+            value={data.total_attempts < 5 ? "In Progress" : `${data.overall_score.toFixed(1)}%`}
+            subtext={data.total_attempts < 5 ? `${data.total_attempts} attempts so far` : "Across completed weeks"}
+            tooltip="Score stabilizes after 5+ quiz attempts"
+          />
+          <DetailStat
+            label="Weeks completed"
+            value={`${data.weeks_completed}/${totalWeeks}`}
+            subtext="≥70% = Proficient, ≥85% = Mastered"
+            tooltip="Completed = average score ≥70%"
+          />
           <DetailStat
             label="Materials viewed"
             value={`${data.materials_accessed}/${data.total_materials}`}
@@ -380,7 +415,7 @@ export default function StudentCourseDetailPage() {
                       <p className="text-sm font-semibold text-gray-900">{rec.material.title}</p>
                       <p className="text-xs text-gray-500">Week {rec.week_number} · {rec.topic}</p>
                     </div>
-                    <a href={rec.material.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-indigo-600">
+                    <a href={rec.material.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-indigo-600" onClick={() => handleMaterialClick(rec.material.id)}>
                       Open ↗
                     </a>
                   </div>
@@ -444,6 +479,7 @@ export default function StudentCourseDetailPage() {
                         target="_blank"
                         rel="noreferrer"
                         className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:border-indigo-200"
+                        onClick={() => handleMaterialClick(material.id)}
                       >
                         <span>
                           <span className="font-medium text-gray-900">{material.title}</span>
@@ -581,6 +617,7 @@ export default function StudentCourseDetailPage() {
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:border-indigo-200"
+                      onClick={() => handleMaterialClick(material.id)}
                     >
                       <span>
                         <span className="font-medium text-gray-900">{material.title}</span>
@@ -604,15 +641,17 @@ function DetailStat({
   value,
   subtext,
   variant = "default",
+  tooltip,
 }: {
   label: string;
   value: string | number;
   subtext: string;
   variant?: "default" | "warning";
+  tooltip?: string;
 }) {
   const textClass = variant === "warning" ? "text-amber-600" : "text-gray-900";
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
+    <div className="rounded-2xl bg-white p-6 shadow-sm" title={tooltip}>
       <p className="text-sm text-gray-500">{label}</p>
       <p className={`mt-2 text-3xl font-semibold ${textClass}`}>{value}</p>
       <p className="mt-2 text-xs text-gray-500">{subtext}</p>

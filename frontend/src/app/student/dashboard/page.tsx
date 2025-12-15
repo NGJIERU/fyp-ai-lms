@@ -28,6 +28,7 @@ type StudentDashboardResponse = {
   recent_activity: RecentActivity[];
   weak_topics_summary: Record<string, number>;
   total_study_time_hours: number;
+  total_study_time_seconds: number;
 };
 
 export default function StudentDashboardPage() {
@@ -128,7 +129,7 @@ export default function StudentDashboardPage() {
           />
           <SummaryCard
             label="Total study time"
-            value={`${data.total_study_time_hours.toFixed(1)} hrs`}
+            value={formatStudyTime(data.total_study_time_seconds ?? (data.total_study_time_hours * 3600))}
             subtext="Recorded via sessions"
           />
           <SummaryCard
@@ -255,4 +256,13 @@ function CourseCard({ course }: { course: EnrolledCourse }) {
       </div>
     </Link>
   );
+}
+
+function formatStudyTime(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (hours === 0 && minutes === 0) return "0 mins";
+  if (hours === 0) return `${minutes} mins`;
+  return `${hours} hrs ${minutes} mins`;
 }

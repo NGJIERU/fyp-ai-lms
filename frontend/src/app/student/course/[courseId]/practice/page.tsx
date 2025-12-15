@@ -7,6 +7,8 @@ import { apiFetch } from "@/lib/api";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import PracticeHistory from "@/components/dashboard/PracticeHistory";
 
+import QuizModal from "@/components/tutor/QuizModal";
+
 // Simple Chart Component (since we don't have recharts installed, using CSS bars)
 function WeakTopicsChart({ topics }: { topics: any[] }) {
     if (!topics.length) return <p className="text-gray-500">No data available.</p>;
@@ -36,6 +38,8 @@ export default function PracticeDashboardPage() {
     const courseId = Number(params?.courseId);
     const { loading: authLoading, authorized } = useRequireRole(["student"]);
     const [stats, setStats] = useState<any>(null);
+    const [isQuizOpen, setIsQuizOpen] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
         if (!authorized || !courseId || isNaN(courseId)) return;
@@ -44,20 +48,33 @@ export default function PracticeDashboardPage() {
         apiFetch(`/api/v1/tutor/weak-topics?course_id=${courseId}`)
             .then(data => setStats(data))
             .catch(err => console.error("Failed to load stats", err));
-    }, [authorized, courseId]);
+    }, [authorized, courseId, refreshKey]); // Refetch when refreshKey updates
 
     if (authLoading) return null;
+
+    const handleQuizClose = () => {
+        setIsQuizOpen(false);
+        setRefreshKey(prev => prev + 1); // Trigger data refresh
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 px-4 py-10">
             <div className="mx-auto flex max-w-5xl flex-col gap-6">
-                <div className="flex flex-col gap-2">
-                    <Link href={`/student/course/${courseId}`} className="text-sm font-medium text-indigo-600">
-                        ← Back to Course
-                    </Link>
-                    <h1 className="text-3xl font-semibold text-gray-900">Practice Dashboard</h1>
-                    <p className="text-gray-500">Track your progress and mastery over time.</p>
-                </div>
+                <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-2">
+                        <Link href={`/student/course/${courseId}`} className="text-sm font-medium text-indigo-600">
+                            ← Back to Course
+                        </Link>
+                        <h1 className="text-3xl font-semibold text-gray-900">Practice Dashboard</h1>
+                        <p className="text-gray-500">Track your progress and mastery over time.</p>
+                    </div>
+                    <button
+                        onClick={() => setIsQuizOpen(true)}
+                        className="rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 hover:shadow-indigo-300"
+                    >
+                        Start Practice Session
+                    </button>
+                </header>
 
                 <div className="grid gap-6 md:grid-cols-2">
                     <section className="rounded-2xl bg-white p-6 shadow-sm">
@@ -84,9 +101,15 @@ export default function PracticeDashboardPage() {
                 </div>
 
                 <section>
-                    <PracticeHistory courseId={courseId} />
+                    <PracticeHistory key={refreshKey} courseId={courseId} />
                 </section>
             </div>
+
+            <QuizModal
+                courseId={courseId}
+                isOpen={isQuizOpen}
+                onClose={handleQuizClose}
+            />
         </div>
     );
 }
