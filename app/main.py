@@ -28,6 +28,10 @@ app.add_middleware(
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+from fastapi.staticfiles import StaticFiles
+
+app.mount("/lecturer/materials", StaticFiles(directory="media/lecturer_materials"), name="lecturer_materials")
+
 
 @app.get("/")
 def root():

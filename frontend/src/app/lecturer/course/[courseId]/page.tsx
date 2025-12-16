@@ -160,12 +160,27 @@ export default function LecturerCourseDetailPage() {
   const createdDate = courseDetail ? new Date(courseDetail.created_at).toLocaleDateString() : null;
   const updatedDate = courseDetail ? new Date(courseDetail.updated_at).toLocaleDateString() : null;
 
-  const handleEmailAll = useCallback(() => {
+  // State for email copy feedback
+  const [emailCopied, setEmailCopied] = useState(false);
+
+  // State for submission modal
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+
+  const handleEmailAll = useCallback(async () => {
     if (students.length === 0) return;
-    const emails = students.map((s) => s.email).join(",");
-    const subject = encodeURIComponent(`${course?.course_code ?? "Course"} update`);
-    const body = encodeURIComponent("Hello team,\n\nLet's discuss upcoming course updates.\n\n");
-    window.location.href = `mailto:?bcc=${encodeURIComponent(emails)}&subject=${subject}&body=${body}`;
+    const emails = students.map((s) => s.email).join(", "); // Space for readability in clipboard
+
+    try {
+      await navigator.clipboard.writeText(emails);
+      setEmailCopied(true);
+      setTimeout(() => setEmailCopied(false), 3000);
+    } catch (err) {
+      console.error("Failed to copy emails", err);
+      // Fallback to mailto if clipboard fails
+      const subject = encodeURIComponent(`${course?.course_code ?? "Course"} update`);
+      const body = encodeURIComponent("Hello team,\n\nLet's discuss upcoming course updates.\n\n");
+      window.location.href = `mailto:?bcc=${encodeURIComponent(emails)}&subject=${subject}&body=${body}`;
+    }
   }, [students, course?.course_code]);
 
   if (authLoading || isLoading) {
@@ -251,12 +266,22 @@ export default function LecturerCourseDetailPage() {
                 <button
                   type="button"
                   onClick={handleEmailAll}
-                  className="w-full rounded-xl border border-gray-100 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:border-indigo-200"
+                  className="w-full rounded-xl border border-gray-100 px-4 py-3 text-left text-sm font-medium text-gray-700 hover:border-indigo-200 transition-colors"
                   disabled={students.length === 0}
                 >
-                  Message enrolled students
-                  <p className="text-xs text-gray-500">
-                    Sends an email to {students.length || "all"} students (via BCC)
+                  <div className="flex items-center justify-between">
+                    <span>Message enrolled students</span>
+                    {emailCopied && (
+                      <span className="text-xs font-semibold text-green-600 animate-pulse">
+                        ✓ Emails Copied!
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {emailCopied
+                      ? "Paste them into your email client's BCC field."
+                      : `Copies ${students.length || "all"} student emails to clipboard`
+                    }
                   </p>
                 </button>
               </div>
@@ -317,17 +342,89 @@ export default function LecturerCourseDetailPage() {
                 <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No recent submissions for this course.</p>
               )}
               {submissions.map((submission, index) => (
-                <div key={`${submission.student_id}-${index}`} className="rounded-lg border border-gray-100 p-4">
-                  <p className="text-sm font-medium text-gray-900">Student #{submission.student_id}</p>
+                <button
+                  key={`${submission.student_id}-${index}`}
+                  onClick={() => setSelectedSubmission(submission)}
+                  className="w-full text-left rounded-lg border border-gray-100 p-4 hover:bg-gray-50 hover:border-indigo-200 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-700">Student #{submission.student_id}</p>
+                    <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">View details →</span>
+                  </div>
                   <p className="text-xs text-gray-500">Week {submission.week_number} · Score {submission.score?.toFixed(1) ?? "-"}%</p>
                   <p className="mt-1 text-xs text-gray-400">
                     {submission.attempted_at ? new Date(submission.attempted_at).toLocaleString() : "Timestamp unavailable"}
                   </p>
-                </div>
+                </button>
               ))}
             </div>
           </div>
         </section>
+
+        {/* Submission Details Modal */}
+        {selectedSubmission && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setSelectedSubmission(null)}>
+            <div
+              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Submission Details</h3>
+                <button
+                  onClick={() => setSelectedSubmission(null)}
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-lg bg-gray-50 p-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Student ID</p>
+                      <p className="mt-1 font-semibold text-gray-900">#{selectedSubmission.student_id}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Week</p>
+                      <p className="mt-1 font-semibold text-gray-900">{selectedSubmission.week_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Score</p>
+                      <p className={`mt-1 font-semibold ${(selectedSubmission.score || 0) >= 70 ? "text-green-600" : "text-amber-600"
+                        }`}>
+                        {selectedSubmission.score?.toFixed(1) ?? "-"}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Submitted</p>
+                      <p className="mt-1 text-gray-900">
+                        {selectedSubmission.attempted_at
+                          ? new Date(selectedSubmission.attempted_at).toLocaleDateString()
+                          : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      // Navigate to full student analytics usually
+                      // For now just close or maybe link to student profile if we had one
+                      setSelectedSubmission(null);
+                    }}
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <section className="rounded-2xl bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between">
@@ -336,21 +433,28 @@ export default function LecturerCourseDetailPage() {
               <p className="text-sm text-gray-500">Track averages, weak topics, and last activity.</p>
             </div>
             <div className="flex items-center gap-3">
-              <label className="text-xs uppercase tracking-wide text-gray-400">Sort by</label>
-              <select
-                className="rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-sm"
-                value={`${sortField}-${sortOrder}`}
-                onChange={(e) => {
-                  const [field, order] = e.target.value.split("-");
-                  setSortField(field as "score" | "last_active");
-                  setSortOrder(order as "asc" | "desc");
-                }}
-              >
-                <option value="score-desc">Highest score</option>
-                <option value="score-asc">Lowest score</option>
-                <option value="last_active-desc">Most recently active</option>
-                <option value="last_active-asc">Longest inactive</option>
-              </select>
+              <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Sort by</label>
+              <div className="relative">
+                <select
+                  className="appearance-none rounded-md border border-gray-300 bg-white py-1.5 pl-3 pr-8 text-sm font-medium text-gray-700 shadow-sm hover:border-indigo-300 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={`${sortField}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [field, order] = e.target.value.split("-");
+                    setSortField(field as "score" | "last_active");
+                    setSortOrder(order as "asc" | "desc");
+                  }}
+                >
+                  <option value="score-desc">Highest score</option>
+                  <option value="score-asc">Lowest score</option>
+                  <option value="last_active-desc">Most recently active</option>
+                  <option value="last_active-asc">Longest inactive</option>
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </div>
           <div className="mt-6 overflow-x-auto">
@@ -361,28 +465,31 @@ export default function LecturerCourseDetailPage() {
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Average score</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Weak topics</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Last active</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {sortedStudents.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">
+                    <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500">
                       No students enrolled yet.
                     </td>
                   </tr>
                 )}
                 {sortedStudents.map((student) => (
-                  <tr key={student.student_id}>
+                  <tr key={student.student_id} className="hover:bg-gray-50/50">
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{student.student_name}</p>
-                      <p className="text-xs text-gray-500">{student.email}</p>
+                      <a href={`mailto:${student.email}`} className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline">
+                        {student.email}
+                      </a>
                     </td>
                     <td className="px-4 py-3 font-semibold text-gray-900">{student.average_score.toFixed(1)}%</td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {student.weak_topics.length === 0 ? (
-                        <span className="text-gray-400">None</span>
+                        <span className="text-gray-400 text-xs italic">No weak topics identified</span>
                       ) : (
-                        <ul className="list-disc space-y-1 pl-4">
+                        <ul className="list-disc space-y-1 pl-4 text-xs">
                           {student.weak_topics.map((topic) => (
                             <li key={topic}>{topic}</li>
                           ))}
@@ -390,7 +497,15 @@ export default function LecturerCourseDetailPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
-                      {student.last_active ? new Date(student.last_active).toLocaleString() : "No activity logged"}
+                      {formatDate(student.last_active)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <a
+                        href={`mailto:${student.email}`}
+                        className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      >
+                        Message
+                      </a>
                     </td>
                   </tr>
                 ))}
@@ -422,4 +537,28 @@ function DetailStat({
       <p className="mt-2 text-xs text-gray-500">{subtext}</p>
     </div>
   );
+}
+
+function formatDate(dateString: string | null | undefined) {
+  if (!dateString) return "No activity logged";
+  // If the string doesn't end in Z and doesn't have an offset, treat it as UTC by appending Z.
+  // This handles naive datetimes from the backend which are typically stored as UTC but sent without info.
+  const dateToParse = (dateString.endsWith("Z") || /[+-]\d\d:?\d\d/.test(dateString))
+    ? dateString
+    : `${dateString}Z`;
+
+  try {
+    const date = new Date(dateToParse);
+    // Use user's local timezone (browser default)
+    return date.toLocaleString(undefined, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch (e) {
+    return dateString;
+  }
 }

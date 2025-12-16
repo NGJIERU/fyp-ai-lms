@@ -146,14 +146,24 @@ export default function LecturerDashboardPage() {
             Monitor course performance, student progress, and pending approvals.
           </p>
         </header>
-
+        <div className="flex justify-end mb-4">
+          <Link href="/lecturer/materials/upload" className="rounded bg-indigo-600 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-700">
+            + Add Material
+          </Link>
+        </div>
         <section className="grid gap-4 md:grid-cols-4">
           <SummaryCard label="Courses" value={totalCourses} subtext="Assigned to you" />
-          <SummaryCard label="Students" value={data.total_students} subtext="Enrolled across courses" />
+          <SummaryCard
+            label="Active Enrollments"
+            value={data.total_students}
+            subtext="Total student-course pairs"
+            tooltip="Count of active enrollments across all your courses (students may be counted multiple times)."
+          />
           <SummaryCard
             label="Avg class score"
-            value={`${avgClassScore.toFixed(1)}%`}
-            subtext="Across all courses"
+            value={`${avgClassScore.toFixed(0)}%`}
+            subtext="Normalized 0-100% across all topic attempts"
+            tooltip="Average of individual topic performance scores for all students."
           />
           <SummaryCard
             label="Pending approvals"
@@ -297,16 +307,29 @@ function SummaryCard({
   value,
   subtext,
   variant = "default",
+  tooltip,
 }: {
   label: string;
   value: string | number;
   subtext: string;
   variant?: "default" | "warning";
+  tooltip?: string;
 }) {
   const textClass = variant === "warning" ? "text-amber-600" : "text-gray-900";
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <p className="text-sm text-gray-500">{label}</p>
+    <div className="group relative rounded-2xl bg-white p-6 shadow-sm">
+      <div className="flex items-center gap-1">
+        <p className="text-sm text-gray-500">{label}</p>
+        {tooltip && (
+          <div className="group/tooltip relative flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-100 text-[10px] text-gray-500">
+            ?
+            <div className="absolute bottom-full left-1/2 mb-2 hidden w-48 -translate-x-1/2 rounded bg-gray-800 px-2 py-1 text-xs text-white shadow-lg group-hover/tooltip:block">
+              {tooltip}
+              <div className="absolute left-1/2 top-full -mt-1 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-800" />
+            </div>
+          </div>
+        )}
+      </div>
       <p className={`mt-2 text-3xl font-semibold ${textClass}`}>{value}</p>
       <p className="mt-2 text-xs text-gray-500">{subtext}</p>
     </div>
@@ -336,17 +359,9 @@ function CourseRow({ course }: { course: LecturerCourseStats }) {
           <span className="text-xs font-semibold text-indigo-600">View analytics →</span>
         </div>
       </div>
-      <div className="mt-4">
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span>Avg class score</span>
-          <span>{course.avg_class_score.toFixed(1)}%</span>
-        </div>
-        <div className="mt-2 h-3 rounded-full bg-white shadow-inner">
-          <div
-            className="h-3 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600"
-            style={{ width: `${Math.min(Math.max(course.avg_class_score, 0), 100)}%` }}
-          />
-        </div>
+      <div className="mt-4 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs text-gray-500 shadow-sm">
+        <span>Class Avg Score</span>
+        <span className="font-mono font-medium text-gray-900">{course.avg_class_score.toFixed(1)}%</span>
       </div>
     </Link>
   );

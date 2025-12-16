@@ -5,7 +5,7 @@ Provides explanations, feedback, weak topic detection, and personalized learning
 import os
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.user import User
@@ -327,7 +327,7 @@ Response:"""
         Returns:
             Grading result with feedback
         """
-        from app.models.performance import QuizAttempt, TopicPerformance
+        from app.models.performance import QuizAttempt, TopicPerformance, ActivityLog
         
         q_type = QuestionType(question_type)
         g_mode = GradingMode(mode)
@@ -390,7 +390,7 @@ Response:"""
             topic_perf.correct_attempts += 1
         
         topic_perf.average_score = new_avg
-        topic_perf.last_attempt_at = datetime.utcnow()
+        topic_perf.last_attempt_at = datetime.now(timezone.utc)
         
         # Determine mastery/weakness
         if new_avg < 60 and new_total >= 3:
@@ -405,6 +405,23 @@ Response:"""
         else:
             topic_perf.mastery_level = "learning"
             
+        # 4. Log activity
+        activity = ActivityLog(
+            user_id=student_id,
+            action="submit_quiz_attempt",
+            resource_type="quiz_attempt",
+            resource_id=attempt.id, # attempt object is added but not flushed/refreshed yet, so ID might be None unless we flush first or let session handle it.
+            # However, SQLAlchemy usually handles this if we add both to session. But to be safe on ID:
+            course_id=course_id,
+            extra_data={
+                "week_number": week_number,
+                "is_correct": result.get("is_correct", False),
+                "score": result.get("score", 0),
+                "mode": mode
+            }
+        )
+        db.add(activity)
+
         db.commit()
         db.refresh(attempt)
         

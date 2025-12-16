@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useRequireRole } from "@/hooks/useRequireRole";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 
 type User = {
   id: number;
@@ -41,6 +42,12 @@ export default function AdminUsersPage() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Search & Pagination State
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const LIMIT = 20;
+
   useEffect(() => {
     if (authLoading) return;
     if (!authorized) return;
@@ -50,12 +57,22 @@ export default function AdminUsersPage() {
     const controller = new AbortController();
 
     async function loadAdminData() {
+      setIsLoading(true);
       try {
+        const queryParams = new URLSearchParams({
+          skip: ((page - 1) * LIMIT).toString(),
+          limit: LIMIT.toString(),
+        });
+
+        if (searchTerm) queryParams.append("search", searchTerm);
+        if (roleFilter !== "all") queryParams.append("role", roleFilter);
+
         const [usersRes, statsRes] = await Promise.all([
-          apiFetch<User[]>("/api/v1/admin/users", {
+          apiFetch<User[]>(`/api/v1/admin/users?${queryParams.toString()}`, {
             headers: { Authorization: `Bearer ${token}` },
             signal: controller.signal,
           }),
+          // Only fetch stats on initial load or always. optimized to always for now.
           apiFetch<SystemStats>("/api/v1/admin/stats", {
             headers: { Authorization: `Bearer ${token}` },
             signal: controller.signal,
@@ -72,9 +89,16 @@ export default function AdminUsersPage() {
       }
     }
 
-    loadAdminData();
-    return () => controller.abort();
-  }, [router, authLoading, authorized]);
+    // Debounce search slightly
+    const timeoutId = setTimeout(() => {
+      loadAdminData();
+    }, 300);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
+  }, [router, authLoading, authorized, page, searchTerm, roleFilter]);
 
   const roleCounts = useMemo(() => {
     if (!stats) return [];
@@ -118,6 +142,7 @@ export default function AdminUsersPage() {
         },
       });
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      // Optimistic stats update
       setStats((prev) => {
         if (!prev) return prev;
         const newTotal = Math.max(prev.total_users - 1, 0);
@@ -212,43 +237,32 @@ export default function AdminUsersPage() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 px-4 py-10">
-        <div className="mx-auto max-w-6xl">
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <p className="text-sm text-gray-500">Loading admin dashboard…</p>
-          </div>
+      <AdminLayout headerTitle="User Management">
+        <div className="rounded-xl bg-white p-6 shadow-sm">
+          <p className="text-sm text-gray-500">Loading admin dashboard...</p>
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 px-4 py-10">
-        <div className="mx-auto max-w-6xl">
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
+      <AdminLayout headerTitle="User Management">
+        <div className="rounded-xl bg-white p-6 shadow-sm">
+          <p className="text-sm text-red-600">{error}</p>
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
   if (!stats) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <header>
-          <p className="text-sm uppercase tracking-wide text-indigo-600">Admin Console</p>
-          <h1 className="mt-2 text-3xl font-semibold text-gray-900">
-            Welcome back, Super Admin
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Review system health, manage users, and monitor overall activity.
-          </p>
-        </header>
-
+    <AdminLayout
+      headerTitle="Welcome back, Super Admin"
+      headerSubtitle="Review system health, manage users, and monitor overall activity."
+    >
+      <div className="flex flex-col gap-6">
         <section className="grid gap-4 md:grid-cols-4">
           <SummaryCard label="Total users" value={stats.total_users} subtext="Across all roles" />
           <SummaryCard label="Active enrollments" value={stats.total_enrollments} subtext="Students currently enrolled" />
@@ -270,15 +284,64 @@ export default function AdminUsersPage() {
           </div>
 
           <div className="rounded-2xl bg-white p-6 shadow-sm lg:col-span-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Users</h2>
-              <button
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-                onClick={openCreateModal}
-              >
-                Add user
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setPage(1);
+                  }}
+                />
+                <select
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={roleFilter}
+                  onChange={(e) => {
+                    setRoleFilter(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="all">All Roles</option>
+                  <option value="student">Student</option>
+                  <option value="lecturer">Lecturer</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+                <button
+                  className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+                  onClick={openCreateModal}
+                >
+                  Add user
+                </button>
+              </div>
             </div>
+
+            {/* Pagination Controls */}
+            <div className="mt-4 flex items-center justify-between border-b border-gray-100 pb-4">
+              <span className="text-sm text-gray-500">
+                Page {page}
+              </span>
+              <div className="space-x-2">
+                <button
+                  className="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </button>
+                <button
+                  className="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={users.length < LIMIT}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+
             <div className="mt-4 overflow-hidden rounded-xl border border-gray-100">
               <table className="min-w-full divide-y divide-gray-100 text-sm">
                 <thead className="bg-gray-50">
@@ -287,6 +350,7 @@ export default function AdminUsersPage() {
                     <th className="px-4 py-3 text-left font-semibold text-gray-700">Email</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
                     <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 bg-white">
@@ -326,103 +390,103 @@ export default function AdminUsersPage() {
             </div>
           </div>
         </section>
+      </div>
 
-        {createModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {editingUser ? "Edit user" : "Create user"}
-                </h3>
-                <button className="text-gray-400 hover:text-gray-600" onClick={() => setCreateModalOpen(false)}>
-                  ×
-                </button>
+      {createModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {editingUser ? "Edit user" : "Create user"}
+              </h3>
+              <button className="text-gray-400 hover:text-gray-600" onClick={() => setCreateModalOpen(false)}>
+                ×
+              </button>
+            </div>
+
+            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Full name</label>
+                <input
+                  type="text"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={formState.full_name}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, full_name: e.target.value }))}
+                />
               </div>
 
-              <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Full name</label>
-                  <input
-                    type="text"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    value={formState.full_name}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, full_name: e.target.value }))}
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <input
+                  type="email"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={formState.email}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, email: e.target.value }))}
+                  required
+                />
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <input
-                    type="email"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    value={formState.email}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, email: e.target.value }))}
-                    required
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Password {editingUser && <span className="text-gray-400">(leave blank to keep current)</span>}
+                </label>
+                <input
+                  type="password"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={formState.password}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, password: e.target.value }))}
+                  required={!editingUser}
+                />
+              </div>
 
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Password {editingUser && <span className="text-gray-400">(leave blank to keep current)</span>}
+                  <label className="block text-sm font-medium text-gray-700">Role</label>
+                  <select
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    value={formState.role}
+                    onChange={(e) => setFormState((prev) => ({ ...prev, role: e.target.value }))}
+                  >
+                    <option value="student">Student</option>
+                    <option value="lecturer">Lecturer</option>
+                    <option value="super_admin">Super admin</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <input
+                    id="is_active"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={formState.is_active}
+                    onChange={(e) => setFormState((prev) => ({ ...prev, is_active: e.target.checked }))}
+                  />
+                  <label htmlFor="is_active" className="text-sm text-gray-700">
+                    Active
                   </label>
-                  <input
-                    type="password"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    value={formState.password}
-                    onChange={(e) => setFormState((prev) => ({ ...prev, password: e.target.value }))}
-                    required={!editingUser}
-                  />
                 </div>
+              </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Role</label>
-                    <select
-                      className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      value={formState.role}
-                      onChange={(e) => setFormState((prev) => ({ ...prev, role: e.target.value }))}
-                    >
-                      <option value="student">Student</option>
-                      <option value="lecturer">Lecturer</option>
-                      <option value="super_admin">Super admin</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2 pt-6">
-                    <input
-                      id="is_active"
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                      checked={formState.is_active}
-                      onChange={(e) => setFormState((prev) => ({ ...prev, is_active: e.target.checked }))}
-                    />
-                    <label htmlFor="is_active" className="text-sm text-gray-700">
-                      Active
-                    </label>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-4">
-                  <button
-                    type="button"
-                    className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    onClick={() => setCreateModalOpen(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-60"
-                  >
-                    {submitting ? "Saving..." : editingUser ? "Save changes" : "Create user"}
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  onClick={() => setCreateModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-60"
+                >
+                  {submitting ? "Saving..." : editingUser ? "Save changes" : "Create user"}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </AdminLayout>
   );
 }
 

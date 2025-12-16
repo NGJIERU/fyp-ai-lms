@@ -530,7 +530,7 @@ export default function StudentCourseDetailPage() {
                       disabled={practiceLoadingWeek === week.week_number}
                       className="rounded-md border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-indigo-200 disabled:opacity-60"
                     >
-                      {practiceLoadingWeek === week.week_number ? "Generating…" : "Practice quiz"}
+                      {practiceLoadingWeek === week.week_number ? "Generating…" : "Generate questions"}
                     </button>
                     <button
                       type="button"

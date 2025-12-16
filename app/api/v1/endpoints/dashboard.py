@@ -230,23 +230,70 @@ def get_student_dashboard(
         
         weak_topics_summary[str(course.id)] = weak_count
     
-    # Get recent activity
-    recent_activity = (
+    # Get recent activity (Fetch more to allow for grouping group)
+    raw_activity = (
         db.query(models.ActivityLog)
         .filter(models.ActivityLog.user_id == current_user.id)
         .order_by(desc(models.ActivityLog.created_at))
-        .limit(10)
+        .limit(50) 
         .all()
     )
     
-    activity_list = [
-        {
-            "action": a.action,
-            "resource_type": a.resource_type,
-            "created_at": a.created_at.isoformat() if a.created_at else None
-        }
-        for a in recent_activity
-    ]
+    # Group consecutive quiz attempts
+    activity_list = []
+    if raw_activity:
+        # We iterate through the raw list. Since it's ordered by DESC (newest first),
+        # we can group "older" identical actions into the "newer" one.
+        
+        current_group = None
+        
+        for log in raw_activity:
+            is_quiz = (log.action == "submit_quiz_attempt")
+            
+            # Start a new group if:
+            # 1. No current group
+            # 2. Action is different
+            # 3. Time gap is too large (> 5 mins)
+            if current_group:
+                time_diff = (current_group["_raw_time"] - log.created_at).total_seconds()
+                same_action = (current_group["action"] == log.action)
+                
+                if same_action and is_quiz and time_diff < 300: # 5 minutes grouping window
+                    # Merge into current group
+                    current_group["count"] = current_group.get("count", 1) + 1
+                    continue
+                else:
+                    # Finalize current group and start new one
+                    # Format the action label for the finished group
+                    if current_group.get("count", 1) > 1:
+                        current_group["action"] = f"Completed {current_group['count']} practice questions"
+                    
+                    # Remove internal helper keys
+                    raw_time = current_group.pop("_raw_time")
+                    count = current_group.pop("count", None)
+                    
+                    activity_list.append(current_group)
+                    current_group = None
+
+            # Create new group item
+            current_group = {
+                "action": log.action,
+                "resource_type": log.resource_type,
+                "created_at": log.created_at.isoformat(),
+                "_raw_time": log.created_at,
+                "count": 1
+            }
+        
+        # Append the last trailing group
+        if current_group:
+            if current_group.get("count", 1) > 1:
+                current_group["action"] = f"Completed {current_group['count']} practice questions"
+            current_group.pop("_raw_time")
+            current_group.pop("count", None)
+            activity_list.append(current_group)
+
+    # Limit to top 10 after grouping
+    activity_list = activity_list[:10]
     
     # Calculate total study time
     sessions = (
@@ -340,7 +387,11 @@ def get_student_course_detail(
         
         if performance:
             status_str = performance.mastery_level
-            score = performance.average_score
+            
+            # NORMALIZATION: Convert 0-100 store to 0-1 ratio for frontend
+            raw_score = performance.average_score
+            score = raw_score / 100.0 if raw_score > 1.0 else raw_score
+            
             total_score += score
             scored_weeks += 1
             
@@ -361,7 +412,7 @@ def get_student_course_detail(
                 weak_topics.append(WeakTopicItem(
                     week_number=entry.week_number,
                     topic=entry.topic,
-                    average_score=score,
+                    average_score=score, # Normalized
                     attempts=performance.total_attempts,
                     recommended_materials=[
                         MaterialItem(
@@ -415,7 +466,8 @@ def get_student_course_detail(
         .count()
     )
     
-    overall_score = (total_score / scored_weeks) if scored_weeks > 0 else 0
+    # Calculate overall score as percentage (0-100)
+    overall_score = ((total_score / scored_weeks) * 100) if scored_weeks > 0 else 0
     
     # Calculate aggregate stats for UX
     total_attempts = (
@@ -543,7 +595,27 @@ def get_lecturer_dashboard(
             .filter(models.TopicPerformance.course_id == course.id)
             .scalar()
         )
-        avg_score = (avg_score_result or 0) * 100
+        
+        # FIX: Clamp score between 0 and 100. 
+        # Assuming database stores 0.0-1.0 ratio, multiply by 100. 
+        # If database stores 0-100, usage of min/max ensures safety.
+        if avg_score_result is None:
+            avg_score = 0.0
+        else:
+            # If result is already > 1.0, it might be stored as percentage. 
+            # If < 1.0, it is ratio. 
+            # To be safe against "106%" issue:
+            # 1. Transform to ratio based on magnitude heuristic or standard (assuming ratio by default)
+            # 2. Clamp final percentage to 100.0
+            
+            raw_val = float(avg_score_result)
+            if raw_val > 1.0:
+                 # Likely already percentage or invalid high ratio
+                 final_percent = raw_val
+            else:
+                 final_percent = raw_val * 100.0
+            
+            avg_score = min(max(final_percent, 0.0), 100.0)
         
         # Count materials
         materials_count = (
@@ -748,44 +820,73 @@ def get_course_students_performance(
             )
             .scalar()
         )
-        avg_score = (avg_score_result or 0) * 100
         
-        # Get weak topics
-        weak_topics = (
-            db.query(models.TopicPerformance)
-            .join(models.Syllabus, 
+        if avg_score_result is None:
+            avg_score = 0.0
+        else:
+            raw_val = float(avg_score_result)
+            # Similar heuristic: if > 1.0 assume percentage, else ratio
+            if raw_val > 1.0:
+                final_percent = raw_val
+            else:
+                 final_percent = raw_val * 100.0
+            
+            avg_score = min(max(final_percent, 0.0), 100.0)
+        
+        # Get weak topics (Dynamic: Bottom 2 lowest scoring topics)
+        weak_topics_query = (
+            db.query(models.Syllabus.topic)
+            .join(models.TopicPerformance, 
                   (models.TopicPerformance.course_id == models.Syllabus.course_id) & 
                   (models.TopicPerformance.week_number == models.Syllabus.week_number))
             .filter(
                 models.TopicPerformance.student_id == student.id,
                 models.TopicPerformance.course_id == course_id,
-                models.TopicPerformance.is_weak_topic == True,
-                models.Syllabus.is_active == True
+                models.Syllabus.is_active == True,
+                models.TopicPerformance.total_attempts > 0  # Only count topics they actually tried
             )
+            .order_by(models.TopicPerformance.average_score.asc())
+            .limit(2)
             .all()
         )
         
-        weak_topic_names = []
-        for wt in weak_topics:
-            syllabus = (
-                db.query(models.Syllabus)
-                .filter(
-                    models.Syllabus.course_id == course_id,
-                    models.Syllabus.week_number == wt.week_number,
-                    models.Syllabus.is_active == True
-                )
-                .first()
-            )
-            if syllabus:
-                weak_topic_names.append(syllabus.topic)
+        weak_topic_names = [w[0] for w in weak_topics_query]
         
         # Get last activity
-        last_activity = (
+        # Priority: ActivityLog > QuizAttempt > TopicPerformance
+        last_active_time = None
+        
+        last_log = (
             db.query(models.ActivityLog)
             .filter(models.ActivityLog.user_id == student.id)
             .order_by(desc(models.ActivityLog.created_at))
             .first()
         )
+        if last_log:
+            last_active_time = last_log.created_at
+
+        # If no activity log, check for recent quiz attempts
+        if not last_active_time:
+            last_quiz = (
+                db.query(models.QuizAttempt)
+                .join(models.Course, models.QuizAttempt.course_id == models.Course.id)
+                .filter(models.QuizAttempt.student_id == student.id)
+                .order_by(desc(models.QuizAttempt.attempted_at))
+                .first()
+            )
+            if last_quiz:
+                last_active_time = last_quiz.attempted_at
+        
+        # If still no activity, check topic performance updates
+        if not last_active_time:
+            last_perf = (
+                db.query(models.TopicPerformance)
+                .filter(models.TopicPerformance.student_id == student.id)
+                .order_by(desc(models.TopicPerformance.last_attempt_at))
+                .first()
+            )
+            if last_perf:
+                last_active_time = last_perf.last_attempt_at
         
         students_performance.append(StudentPerformanceItem(
             student_id=student.id,
@@ -793,7 +894,7 @@ def get_course_students_performance(
             email=student.email,
             average_score=round(avg_score, 1),
             weak_topics=weak_topic_names,
-            last_active=last_activity.created_at if last_activity else None
+            last_active=last_active_time
         ))
     
     return students_performance

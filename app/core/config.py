@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "YOUR_SUPER_SECRET_KEY_CHANGE_IN_PRODUCTION"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 days
 
     # AI / OpenAI settings
     OPENAI_API_KEY: Optional[str] = None

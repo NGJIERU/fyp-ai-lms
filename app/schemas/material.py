@@ -155,3 +155,11 @@ class MaterialRatingInsight(MaterialRatingSummary):
     course_id: int
     course_name: Optional[str] = None
 
+
+class MaterialResponse(MaterialRead):
+    material_type: str = Field(..., description="Type of material (uploaded/crawled)")
+    uploaded_by: Optional[int] = Field(None, description="ID of the uploader")
+    file_name: Optional[str] = Field(None, description="Original filename")
+    file_size: Optional[int] = Field(None, description="File size in bytes")
+    content_type: Optional[str] = Field(None, description="MIME type")
+
