@@ -1,6 +1,6 @@
 from datetime import timedelta
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -8,7 +8,7 @@ from app.api import deps
 from app.core import security
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import user as models
+from app import models
 from app.schemas import token as token_schemas
 from app.schemas import user as user_schemas
 
@@ -16,7 +16,9 @@ router = APIRouter()
 
 @router.post("/login", response_model=token_schemas.Token)
 def login_access_token(
-    db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()
+    request: Request,
+    db: Session = Depends(get_db),
+    form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
     """
     OAuth2 compatible token login, get an access token for future requests
@@ -27,6 +29,17 @@ def login_access_token(
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     
+    # Log the login activity
+    activity = models.ActivityLog(
+        user_id=user.id,
+        action="login",
+        resource_type="system",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    db.add(activity)
+    db.commit()
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
         "access_token": security.create_access_token(

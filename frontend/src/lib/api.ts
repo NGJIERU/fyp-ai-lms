@@ -11,13 +11,16 @@ export async function apiFetch<T>(
   // Auto-include auth token if available
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
 
+  const isFormData = options?.body instanceof FormData;
+  const headers: HeadersInit = {
+    ...(!isFormData && { "Content-Type": "application/json" }),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options?.headers ?? {}),
+  };
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options?.headers ?? {}),
-    },
+    headers,
   });
 
   const contentType = res.headers.get("content-type") ?? "";

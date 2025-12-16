@@ -201,3 +201,129 @@ def delete_course(
     db.commit()
     return None
 
+
+@router.post("/{course_id}/students", response_model=schemas.course.CourseStudentResponse, status_code=status.HTTP_201_CREATED)
+def enroll_student_by_email(
+    course_id: int,
+    enroll_in: schemas.course.CourseStudentEnroll,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_lecturer),
+):
+    """
+    Enroll a student into a course by email.
+    Only the course lecturer or super admin can perform this action.
+    """
+    # Verify course exists
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Access control: Lecturer must own the course
+    if current_user.role == models.UserRole.LECTURER and course.lecturer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only manage students for your own courses"
+        )
+
+    # Find the student
+    student = db.query(models.User).filter(
+        models.User.email == enroll_in.email,
+        # Potentially verify role is STUDENT. But maybe we allow enrolling anyone?
+        # Usually only students should be enrolled as students.
+        # Let's enforce role=STUDENT for clarity.
+        models.User.role == models.UserRole.STUDENT
+    ).first()
+
+    if not student:
+        raise HTTPException(status_code=404, detail=f"No student account found with email {enroll_in.email}")
+
+    # Check existing enrollment
+    existing = (
+        db.query(models.StudentEnrollment)
+        .filter(
+            models.StudentEnrollment.student_id == student.id,
+            models.StudentEnrollment.course_id == course_id
+        )
+        .first()
+    )
+
+    if existing:
+        if existing.is_active:
+            raise HTTPException(status_code=409, detail="Student is already enrolled in this course")
+        else:
+            # Reactivate
+            existing.is_active = True
+            db.commit()
+            return {
+                "student_id": student.id,
+                "course_id": course_id,
+                "message": "Student re-enrolled successfully",
+                "student_name": student.full_name or student.email,
+                "student_email": student.email
+            }
+
+    # Create new enrollment
+    enrollment = models.StudentEnrollment(
+        student_id=student.id,
+        course_id=course_id
+    )
+    db.add(enrollment)
+    db.commit()
+
+    return {
+        "student_id": student.id,
+        "course_id": course_id,
+        "message": "Student enrolled successfully",
+        "student_name": student.full_name or student.email,
+        "student_email": student.email
+    }
+
+
+@router.delete("/{course_id}/students/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_student_from_course(
+    course_id: int,
+    student_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_lecturer),
+):
+    """
+    Remove (un-enroll) a student from a course.
+    """
+    # Verify course exists
+    course = db.query(models.Course).filter(models.Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Access control
+    if current_user.role == models.UserRole.LECTURER and course.lecturer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only manage students for your own courses"
+        )
+
+    # Find enrollment
+    enrollment = (
+        db.query(models.StudentEnrollment)
+        .filter(
+            models.StudentEnrollment.student_id == student_id,
+            models.StudentEnrollment.course_id == course_id
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Student is not enrolled in this course")
+
+    # Hard delete or soft delete?
+    # Let's do hard delete to keep it simple and clean, OR soft delete (is_active=False).
+    # The models for analytics often rely on enrollment existence. 
+    # For now, let's just DELETE the record to fully remove them.
+    # But wait, foreign keys on quiz attempts might cascade or break.
+    # The QuizAttempt model has ondelete="CASCADE", so deleting user deletes attempts.
+    # Actually, StudentEnrollment doesn't seem to be parent of QuizAttempt directly.
+    # Let's check StudentEnrollment definition again. It doesn't have cascades from it.
+    # So deleting enrollment is safe.
+    
+    db.delete(enrollment)
+    db.commit()
+    return None

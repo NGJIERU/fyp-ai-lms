@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, EmailStr
 from typing import Optional
 from datetime import datetime
 import re
@@ -34,3 +34,12 @@ class CourseRead(CourseBase):
     class Config:
         from_attributes = True
 
+class CourseStudentEnroll(BaseModel):
+    email: EmailStr = Field(..., description="Email address of the student to enroll")
+
+class CourseStudentResponse(BaseModel):
+    student_id: int
+    course_id: int
+    message: str
+    student_name: str
+    student_email: str

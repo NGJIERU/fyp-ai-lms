@@ -19,7 +19,7 @@ class Material(Base):
     type = Column(String(50), nullable=False)  # e.g., "pdf", "video", "repository", "blog", "article"
     
     # Material classification
-    material_type = Column(String(20), nullable=False, default="crawled", index=True)  # "crawled" or "uploaded"
+    material_type = Column(String(20), nullable=False, default="crawled")  # "crawled" or "uploaded"
     
     # Original crawled material fields
     author = Column(Text, nullable=True)
@@ -32,7 +32,7 @@ class Material(Base):
     embedding = Column(JSON, nullable=True)  # Store embeddings as JSON-compatible array/object
     
     # Upload-specific fields (only for material_type="uploaded")
-    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     file_name = Column(String(255), nullable=True)  # Original filename
     file_path = Column(String(512), nullable=True, unique=True)  # Server storage path
     file_size = Column(Integer, nullable=True)  # File size in bytes

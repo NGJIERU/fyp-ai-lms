@@ -61,6 +61,17 @@ class EmbeddingService:
         except ImportError:
             logger.error("sentence-transformers not installed. Run: pip install sentence-transformers")
             raise
+        except (OSError, Exception) as e:
+            logger.warning(f"Failed to load model '{self.model_name}': {e}")
+            logger.info("Falling back to default model: all-MiniLM-L6-v2")
+            try:
+                self.model_name = "all-MiniLM-L6-v2"
+                self.model = SentenceTransformer(self.model_name)
+                self.embedding_dim = self.model.get_sentence_embedding_dimension()
+                logger.info(f"Loaded fallback local embedding model: {self.model_name} ({self.embedding_dim} dims)")
+            except Exception as fallback_error:
+                logger.error(f"Critical error: Failed to load fallback model: {fallback_error}")
+                raise e
         except Exception as e:
             logger.error(f"Error loading embedding model: {e}")
             raise

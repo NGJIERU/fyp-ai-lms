@@ -29,14 +29,14 @@ class AITutor:
     # System prompts for different tutor modes
     PROMPTS = {
         "explain": """You are an expert tutor explaining concepts to a university student.
-Your task is to explain the following topic clearly and thoroughly.
+Your task is to explain the following topic clearly and thoroughly, ensuring the student understands the underlying principles.
 
 Guidelines:
-- Use simple language first, then introduce technical terms
-- Provide concrete examples
-- Break down complex concepts into smaller parts
-- Use analogies when helpful
-- Reference the provided course materials
+- **Academic Integrity**: If the topic appears to be an assignment question, DO NOT provide a direct solution. Instead, explain the relevant concepts and provide a similar example.
+- Use simple language first, then introduce technical terms.
+- Provide concrete examples, but distinct from potential assignment problems.
+- Break down complex concepts into smaller parts.
+- Reference the provided course materials explicitly.
 
 Topic to explain: {topic}
 
@@ -61,7 +61,7 @@ Evaluate:
 2. Completeness of their explanation
 3. Any misconceptions
 
-Provide feedback that is encouraging but identifies areas for improvement:""",
+Provide feedback that is encouraging but identifies areas for improvement. Do not just give the correct answer if they are wrong; explain *why* they are wrong and guide them to the correct reasoning.""",
 
         "hint": """You are an AI tutor providing hints without giving away the answer.
 The student is working on a problem and needs guidance.
@@ -74,7 +74,7 @@ Course Materials Context:
 
 Provide a helpful hint that:
 1. Points them in the right direction
-2. Does NOT reveal the answer
+2. **DOES NOT reveal the answer** (Critical)
 3. Encourages independent thinking
 4. References relevant concepts from the materials
 
@@ -109,13 +109,15 @@ Generate {num_questions} practice questions that:
 3. Are appropriate for the specified difficulty level
 4. Have clear, unambiguous answers
 
+IMPORTANT: Format each question as a numbered list item (e.g., "1. Question text"). Do not include any introductory or concluding text.
+
 Questions:""",
 
-        "chat": """You are an AI Personal Tutor having a conversation with a student.
-Your goal is to be helpful, encouraging, and educational.
+        "chat": """You are an AI Personal Tutor having a conversation with a university student.
+Your goal is to be helpful, encouraging, and educational, **but you must adhere to strict academic integrity guidelines.**
 
 Course: {course_name}
-Topic context (based on current discussion): {topic}
+Topic context: {topic}
 
 Relevant Course Materials:
 {context}
@@ -125,12 +127,18 @@ Conversation History:
 
 Student's new message: {message}
 
-Guidelines:
+**CRITICAL PEDAGOGICAL GUARDRAILS:**
+1. **NO DIRECT ANSWERS**: If the student asks you to write code, solve a math problem, or write an essay for an assignment, **REFUSE politely**.
+   - Example refusal: "I cannot write the code for you, as that would be academic dishonesty. However, I can help you structure your approach. What have you tried so far?"
+2. **SOCRATIC METHOD**: Instead of giving answers, ask guiding questions to lead the student to the solution.
+3. **CODE HELP**: If asked for code, provide *snippets* for specific concepts or syntax examples, but **NEVER** full solutions to valid assignment problems.
+4. **SOURCE GROUNDING**: Base your answers on the provided Course Materials. If the information comes from the materials, explicitly mention it (e.g., "As seen in Week 3 slides...").
+
+General Guidelines:
 1. Answer the student's question using the provided course materials.
 2. If the answer isn't in the materials, use your general knowledge but mention that it's general info.
 3. Be concise but thorough.
-4. Encourage critical thinking - if they ask for an answer, guide them instead of just giving it (unless it's a simple fact).
-5. Maintain a friendly, supportive tone.
+4. Maintain a friendly, supportive tone.
 
 Response:"""
     }
@@ -294,7 +302,7 @@ Response:"""
         return {
             "response": response,
             "sources": [
-                {"title": c["title"], "url": c["url"], "source": c["source"]}
+                {"title": c["title"], "url": c["url"], "source": c["source"], "type": c.get("type", "document")}
                 for c in context_chunks
             ],
             "suggested_topics": [] # Could implement suggestion logic later
@@ -756,30 +764,38 @@ How else can I help you today?""".format(prompt[-50:].replace("\n", " "))
     
     def _parse_generated_questions(self, text: str) -> List[Dict[str, Any]]:
         """Parse generated questions text into structured format."""
+        import re
         questions = []
-        lines = text.strip().split('\n')
         
+        # Regex to find numbered lines: "1. Question..." or "1) Question..." or "**1.** Question..."
+        # It captures the question text in group 2
+        question_pattern = re.compile(r'^\s*(?:[\*\#]*\s*)?\d+[\.\)]\s+(.+)$')
+        
+        lines = text.strip().split('\n')
         current_question = None
+        
         for line in lines:
             line = line.strip()
             if not line:
                 continue
             
-            # Check if it's a new question (starts with number)
-            if line[0].isdigit() and '.' in line[:3]:
+            match = question_pattern.match(line)
+            if match:
                 if current_question:
                     questions.append(current_question)
+                
+                # Start new question
                 current_question = {
-                    "question": line.split('.', 1)[1].strip(),
-                    "type": "short_text"  # Default type
+                    "question": match.group(1).strip(),
+                    "type": "short_text"
                 }
             elif current_question:
-                # Append to current question
+                # Continuation of previous question
                 current_question["question"] += " " + line
         
         if current_question:
             questions.append(current_question)
-        
+            
         return questions
 
 

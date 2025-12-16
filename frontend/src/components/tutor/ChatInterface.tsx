@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api";
 export type ChatMessage = {
     role: "user" | "assistant";
     content: string;
-    sources?: { title: string; url?: string; source?: string }[];
+    sources?: { title: string; url?: string; source?: string; type?: string }[];
 };
 
 type ChatInterfaceProps = {
@@ -114,7 +114,7 @@ export default function ChatInterface({ courseId, initialMessage, onClose }: Cha
                             {msg.sources && msg.sources.length > 0 && (
                                 <div className={`mt-3 border-t pt-2 text-xs ${msg.role === "user" ? "border-indigo-500/30 text-indigo-100" : "border-gray-200 text-gray-500"
                                     }`}>
-                                    <p className="mb-1 font-semibold uppercase opacity-70">Sources:</p>
+                                    <p className="mb-2 font-semibold uppercase opacity-70 tracking-wider text-[10px]">Sources Used:</p>
                                     <div className="flex flex-wrap gap-2">
                                         {msg.sources.map((src, i) => (
                                             <a
@@ -122,10 +122,21 @@ export default function ChatInterface({ courseId, initialMessage, onClose }: Cha
                                                 href={src.url || "#"}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className={`underline decoration-dotted hover:decoration-solid ${msg.role === "user" ? "hover:text-white" : "hover:text-indigo-600"
+                                                className={`group flex items-center space-x-1.5 rounded-md border px-2 py-1 transition-all ${msg.role === "user"
+                                                    ? "border-indigo-400 bg-indigo-700/50 hover:bg-indigo-700"
+                                                    : "border-gray-200 bg-white hover:border-indigo-300 hover:shadow-sm"
                                                     }`}
                                             >
-                                                {src.title}
+                                                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${msg.role === "user"
+                                                    ? "bg-indigo-800 text-indigo-200"
+                                                    : "bg-gray-100 text-gray-600 group-hover:bg-indigo-50 group-hover:text-indigo-600"
+                                                    }`}>
+                                                    {src.type || "DOC"}
+                                                </span>
+                                                <span className={`truncate max-w-[150px] ${msg.role === "user" ? "text-indigo-50" : "text-gray-700 group-hover:text-indigo-700"
+                                                    }`}>
+                                                    {src.title}
+                                                </span>
                                             </a>
                                         ))}
                                     </div>

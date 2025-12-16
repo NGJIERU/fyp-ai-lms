@@ -67,6 +67,7 @@ export default function LecturerDashboardPage() {
   const [data, setData] = useState<LecturerDashboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCrawling, setIsCrawling] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -134,11 +135,46 @@ export default function LecturerDashboardPage() {
 
   if (!data) return null;
 
+  const handleSignOut = () => {
+    localStorage.removeItem("access_token");
+    router.replace("/login");
+  };
+
+
+
+  async function handleTriggerCrawl() {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+
+    setIsCrawling(true);
+    try {
+      await apiFetch("/api/v1/materials/crawl", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ crawler_type: "all", max_items: 5 }),
+      });
+      // Show success feedback (simulated toast for now)
+      alert("✨ AI Agent started! It's scouting the web for new resources. Check back in a few minutes.");
+    } catch (err: any) {
+      alert(err.message ?? "Failed to start crawler");
+    } finally {
+      setIsCrawling(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <header>
-          <p className="text-sm uppercase tracking-wide text-indigo-600">Lecturer Dashboard</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm uppercase tracking-wide text-indigo-600">Lecturer Dashboard</p>
+            <button
+              onClick={handleSignOut}
+              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-red-600"
+            >
+              Sign out
+            </button>
+          </div>
           <h1 className="mt-2 text-3xl font-semibold text-gray-900">
             Welcome back, {data.lecturer_name}
           </h1>
@@ -146,9 +182,31 @@ export default function LecturerDashboardPage() {
             Monitor course performance, student progress, and pending approvals.
           </p>
         </header>
-        <div className="flex justify-end mb-4">
-          <Link href="/lecturer/materials/upload" className="rounded bg-indigo-600 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-700">
-            + Add Material
+        <div className="flex items-center justify-end gap-3 mb-4">
+          <button
+            onClick={handleTriggerCrawl}
+            disabled={isCrawling}
+            className={`flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all hover:shadow-lg hover:from-indigo-700 hover:to-violet-700 disabled:opacity-70 ${isCrawling ? "cursor-wait" : ""}`}
+          >
+            {isCrawling ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Scouting web...</span>
+              </>
+            ) : (
+              <>
+                <span>✨</span> Auto-Discover Materials
+              </>
+            )}
+          </button>
+          <Link
+            href="/lecturer/materials/upload"
+            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:text-indigo-600 hover:border-indigo-200"
+          >
+            <span>+</span> Add Material manually
           </Link>
         </div>
         <section className="grid gap-4 md:grid-cols-4">

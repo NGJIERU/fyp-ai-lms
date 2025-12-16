@@ -4,7 +4,7 @@ Retrieves relevant context from approved materials for AI tutor responses
 """
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app.models.material import Material, MaterialTopic
 from app.models.syllabus import Syllabus
@@ -206,6 +206,7 @@ class RAGPipeline:
             db.query(Material)
             .join(MaterialTopic, Material.id == MaterialTopic.material_id)
             .filter(MaterialTopic.course_id == course_id)
+            .options(defer(Material.embedding))
         )
         
         if week_number:

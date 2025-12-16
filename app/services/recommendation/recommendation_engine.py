@@ -5,7 +5,7 @@ Ranks and filters recommendations for lecturer approval
 """
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.material import Material, MaterialTopic
@@ -486,7 +486,7 @@ class RecommendationEngine:
             return []
 
         performance_map = self._get_student_topic_performance_map(db, student_id, course_id)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         personalized_recs: List[Dict[str, Any]] = []
         seen_material_ids = set()
 
