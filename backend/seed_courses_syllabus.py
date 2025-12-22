@@ -171,11 +171,13 @@ def seed_courses_and_syllabus(db: Session, lecturer_id: int = 7):
             created_courses[course_data["code"]] = existing_course
             continue
         
+        from datetime import datetime
         course = Course(
             code=course_data["code"],
             name=course_data["name"],
             description=course_data["description"],
-            lecturer_id=lecturer_id
+            lecturer_id=lecturer_id,
+            updated_at=datetime.now()
         )
         db.add(course)
         db.flush()  # Get the ID without committing

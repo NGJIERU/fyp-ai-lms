@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      # Mount data directories to persist them if not using a separate volume setup in this simple guide
+      # but since ./backend is mounted, everything in it is synced.
+    env_file:
+      - ./backend/.env
+    # Command to ensure DB migrations or checks run if needed, but for now standard start
+    # We might need to handle the DB file location if it's sqlite.
+    environment:
+      - PYTHONPATH=/app
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Anonymous volume to prevent host node_modules from overwriting container's
+      - /app/.next # Anonymous volume for build artifacts
+    env_file:
+      - ./frontend/.env.local
+    environment:
+      # Ensure frontend knows where backend is. 
+      # Since we are using Next.js, CLIENT side calls go to localhost:8000 (user's browser -> backend)
+      # SERVER side calls go to http://backend:8000 (container -> container)
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
