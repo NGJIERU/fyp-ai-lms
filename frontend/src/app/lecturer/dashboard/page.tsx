@@ -170,7 +170,7 @@ export default function LecturerDashboardPage() {
             <p className="text-sm uppercase tracking-wide text-indigo-600">Lecturer Dashboard</p>
             <button
               onClick={handleSignOut}
-              className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-red-600"
+              className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50 ring-1 ring-inset ring-gray-300"
             >
               Sign out
             </button>
