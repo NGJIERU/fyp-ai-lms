@@ -445,13 +445,19 @@ def get_student_course_detail(
         lecturer_name = lecturer.full_name if lecturer else None
     
     # Count materials accessed (distinct materials viewed in this course)
+    # Count materials accessed (distinct materials viewed in this course AND in syllabus)
     materials_accessed = (
         db.query(models.ActivityLog.resource_id)
+        .join(models.MaterialTopic, 
+              (models.MaterialTopic.material_id == models.ActivityLog.resource_id) & 
+              (models.MaterialTopic.course_id == course_id) &
+              (models.MaterialTopic.approved_by_lecturer == True)
+        )
         .filter(
             models.ActivityLog.user_id == current_user.id,
             models.ActivityLog.action == "view_material",
             models.ActivityLog.resource_type == "material",
-            models.ActivityLog.course_id == course_id  # Filter by course
+            models.ActivityLog.course_id == course_id
         )
         .distinct()
         .count()

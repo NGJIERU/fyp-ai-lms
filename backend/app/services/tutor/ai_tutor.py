@@ -45,7 +45,8 @@ Course Materials Context:
 
 Student's specific question (if any): {question}
 
-Provide a clear, educational explanation:""",
+Provide a clear, educational explanation.
+IMPORTANT: Do NOT generate practice questions or quizzes at the end. Your goal is purely to explain the concept.""",
 
         "check_understanding": """You are an AI tutor checking a student's understanding.
 Analyze their response and provide constructive feedback.
@@ -183,14 +184,16 @@ Response:"""
     
     def _init_llm_client(self):
         """Initialize the LLM client."""
+        logger.info(f"Attempting to initialize OpenAI client with model: {self.model}, API key present: {bool(self.api_key)}")
         try:
             from openai import OpenAI
+            logger.info("OpenAI package imported successfully")
             self.llm_client = OpenAI(api_key=self.api_key)
-            logger.info(f"Initialized OpenAI client with model {self.model}")
-        except ImportError:
-            logger.warning("OpenAI package not installed")
+            logger.info(f"✅ Initialized OpenAI client with model {self.model}")
+        except ImportError as e:
+            logger.error(f"❌ OpenAI package not installed: {e}")
         except Exception as e:
-            logger.error(f"Error initializing OpenAI client: {e}")
+            logger.error(f"❌ Error initializing OpenAI client: {e}", exc_info=True)
     
     def explain_concept(
         self,
@@ -807,5 +810,7 @@ def get_ai_tutor() -> AITutor:
     """Get or create the AI tutor singleton."""
     global _ai_tutor
     if _ai_tutor is None:
+        logger.info(f"🔧 Creating new AITutor instance. USE_OPENAI_TUTOR={settings.USE_OPENAI_TUTOR}, API_KEY_SET={bool(settings.OPENAI_API_KEY)}, MODEL={settings.AI_TUTOR_MODEL}")
         _ai_tutor = AITutor()
+        logger.info(f"✅ AITutor created. LLM client initialized: {_ai_tutor.llm_client is not None}")
     return _ai_tutor

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 import { useParams, useRouter } from "next/navigation";
 
 import { apiFetch } from "@/lib/api";
@@ -40,9 +41,9 @@ type CourseDetailResponse = {
   weekly_progress: WeeklyProgress[];
   weak_topics: WeakTopicItem[];
   overall_score: number;
-  total_attempts: number;   // For UX: hide score if < 3
-  weeks_attempted: number;  // Weeks with any quiz attempts
-  weeks_completed: number;  // Weeks with mastery >= 70%
+  total_attempts: number;
+  weeks_attempted: number;
+  weeks_completed: number;
   materials_accessed: number;
   total_materials: number;
 };
@@ -200,6 +201,18 @@ export default function StudentCourseDetailPage() {
 
   const totalWeeks = data?.weekly_progress.length ?? 0;
 
+  // Computed set of material IDs already shown in bundles
+  const bundleMaterialIds = useMemo(() => {
+    const ids = new Set<number>();
+    bundles.forEach(b => b.materials.forEach(m => ids.add(m.id)));
+    return ids;
+  }, [bundles]);
+
+  // Filtered recommendations (exclude those in bundles)
+  const filteredPersonalizedRecs = useMemo(() => {
+    return personalizedRecs.filter(r => !bundleMaterialIds.has(r.material.id));
+  }, [personalizedRecs, bundleMaterialIds]);
+
   async function handleRateMaterial(materialId: number, score: number) {
     if (ratingInFlight) return;
     setRatingInFlight(materialId);
@@ -212,14 +225,12 @@ export default function StudentCourseDetailPage() {
         else next.add(materialId);
         return next;
       });
-      // Ensure it's not hidden
       setHiddenRecs((prev) => {
         const next = new Set(prev);
         next.delete(materialId);
         return next;
       });
     } else if (score < 0) {
-      // Hide immediately
       setHiddenRecs((prev) => {
         const next = new Set(prev);
         next.add(materialId);
@@ -237,7 +248,6 @@ export default function StudentCourseDetailPage() {
         body: JSON.stringify({ rating: score }),
       });
 
-      // Fetch latest ratings to keep counts in sync
       const summary = await apiFetch<RatingSummary>(
         `/api/v1/materials/${materialId}/ratings/summary`
       );
@@ -253,11 +263,9 @@ export default function StudentCourseDetailPage() {
   }
 
   function handleMaterialClick(materialId: number, resourceType: string = "material") {
-    // Fire and forget logging
     const token = localStorage.getItem("access_token");
     if (!token || !data) return;
 
-    // Use direct fetch (not async/await since we don't wait for result)
     fetch("http://localhost:8000/api/v1/analytics/log", {
       method: "POST",
       headers: {
@@ -268,10 +276,10 @@ export default function StudentCourseDetailPage() {
         action: "view_material",
         resource_type: resourceType,
         resource_id: materialId,
-        course_id: data.course_id,  // Include course context
+        course_id: data.course_id,
       }),
-      keepalive: true, // Ensures request completes even if page unloads
-    }).catch(() => { }); // Silently ignore errors
+      keepalive: true,
+    }).catch(() => { });
   }
 
   async function handleGenerateQuestions(weekNumber: number) {
@@ -318,14 +326,26 @@ export default function StudentCourseDetailPage() {
     }
     setTutorLoadingWeek(weekNumber);
     setActionError(null);
+
+    // Contextual Link: If questions are already generated, send them to the tutor!
+    const existingQuestions = practiceResults[weekNumber];
+    let promptTopic = topic;
+    if (existingQuestions && existingQuestions.questions.length > 0) {
+      const questionList = existingQuestions.questions.map((q, i) => `${i + 1}. ${q.question}`).join("\n");
+      promptTopic = `Explain the key concepts needed to answer these practice questions:\n${questionList}`;
+    }
+
     try {
+      // NOTE: We are "hijacking" the topic field to pass the fuller prompt. 
+      // Ideally backend should have a separate 'context' field, but this works with the existing API
+      // because the backend uses the 'topic' field to search RAG and prompt the LLM.
       const response = await apiFetch<ExplainResponse>(`/api/v1/tutor/explain?course_id=${data.course_id}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          topic,
+          topic: promptTopic,
           week_number: weekNumber,
         }),
       });
@@ -451,15 +471,14 @@ export default function StudentCourseDetailPage() {
               }`}
           >
             Smart Feed
-            {(personalizedRecs.length > 0 || data.weak_topics.length > 0) && (
+            {(filteredPersonalizedRecs.length > 0 || data.weak_topics.length > 0) && (
               <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">
-                {personalizedRecs.length + data.weak_topics.length}
+                {filteredPersonalizedRecs.length + data.weak_topics.length}
               </span>
             )}
           </button>
         </div>
 
-        {/* Tab Content */}
         {activeTab === "curriculum" ? (
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
@@ -470,84 +489,18 @@ export default function StudentCourseDetailPage() {
             </div>
             {actionError && <p className="mt-3 text-sm text-red-600">{actionError}</p>}
             <div className="mt-6 space-y-4">
-              {data.weekly_progress.map((week) => {
-                const statusClass = STATUS_COLOR[week.status] ?? STATUS_COLOR.default;
-                return (
-                  <div key={week.week_number} className="rounded-xl border border-gray-100 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Week {week.week_number}</p>
-                        <p className="text-xs text-gray-500">{week.topic}</p>
-                      </div>
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
-                        {formatStatusLabel(week.status)}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-gray-500">
-                      <span>{week.materials_count} materials available</span>
-                      <span>
-                        Score: {typeof week.score === "number" ? `${(week.score * 100).toFixed(0)}%` : "—"}
-                      </span>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleGenerateQuestions(week.week_number)}
-                        disabled={practiceLoadingWeek === week.week_number}
-                        className="rounded-md border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-indigo-200 disabled:opacity-60"
-                      >
-                        {practiceLoadingWeek === week.week_number ? "Generating…" : "Generate questions"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAskTutor(week.week_number, week.topic)}
-                        disabled={tutorLoadingWeek === week.week_number}
-                        className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-60"
-                      >
-                        {tutorLoadingWeek === week.week_number ? "Connecting…" : "Ask AI tutor"}
-                      </button>
-                    </div>
-                    {practiceResults[week.week_number] && (
-                      <div className="mt-4 rounded-lg bg-indigo-50 p-4 text-sm text-indigo-900">
-                        <p className="font-semibold">
-                          Practice set · Week {practiceResults[week.week_number]?.week_number}{" "}
-                          ({practiceResults[week.week_number]?.difficulty})
-                        </p>
-                        <ul className="mt-2 space-y-2">
-                          {practiceResults[week.week_number]?.questions.map((question, index) => (
-                            <li key={index} className="leading-snug">
-                              <span className="font-medium text-indigo-800">Q{index + 1}:</span> {question.question}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {tutorResponses[week.week_number] && (
-                      <div className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-700">
-                        <p className="font-semibold text-gray-900">Tutor insight</p>
-                        <p className="mt-2 whitespace-pre-line">{tutorResponses[week.week_number]?.explanation}</p>
-                        {tutorResponses[week.week_number]?.sources?.length ? (
-                          <div className="mt-3 text-xs text-gray-500">
-                            Sources:{" "}
-                            {tutorResponses[week.week_number]?.sources.map((source, index) => (
-                              <span key={`${source.title}-${index}`}>
-                                {source.url ? (
-                                  <a href={source.url} target="_blank" rel="noreferrer" className="text-indigo-600 underline">
-                                    {source.title}
-                                  </a>
-                                ) : (
-                                  source.title
-                                )}
-                                {index < (tutorResponses[week.week_number]?.sources.length ?? 0) - 1 ? ", " : ""}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {data.weekly_progress.map((week) => (
+                <WeekCard
+                  key={week.week_number}
+                  week={week}
+                  practiceResult={practiceResults[week.week_number] ?? null}
+                  tutorResponse={tutorResponses[week.week_number] ?? null}
+                  onGenerateQuestions={() => handleGenerateQuestions(week.week_number)}
+                  onAskTutor={() => handleAskTutor(week.week_number, week.topic)}
+                  isGenerating={practiceLoadingWeek === week.week_number}
+                  isAskingTutor={tutorLoadingWeek === week.week_number}
+                />
+              ))}
             </div>
           </section>
         ) : (
@@ -555,16 +508,24 @@ export default function StudentCourseDetailPage() {
             <section className="rounded-2xl bg-white p-6 shadow-sm">
               <header className="flex flex-col gap-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Personalized feed</p>
-                <h2 className="text-lg font-semibold text-gray-900">AI picked for you</h2>
-                <p className="text-sm text-gray-500">Launch quick wins based on your mastery gaps.</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🎯</span>
+                  <div className="group relative">
+                    <h2 className="text-lg font-semibold text-gray-900 cursor-help border-b border-dotted border-gray-400">Targeted Practice</h2>
+                    <div className="absolute bottom-full left-0 mb-2 hidden w-64 rounded-lg bg-gray-800 p-2 text-xs text-white shadow-lg group-hover:block z-10">
+                      Resources specifically chosen to improve your weak topics based on quiz performance.
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500">Resources specifically chosen to improve your weak topics.</p>
               </header>
               <div className="mt-5 space-y-4">
-                {personalizedRecs.filter(r => !hiddenRecs.has(r.material.id)).length === 0 && (
+                {filteredPersonalizedRecs.length === 0 && (
                   <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
-                    {personalizedRecs.length > 0 ? "You've cleared your feed!" : "No personalized recommendations yet—complete a few practice questions to get tailored suggestions."}
+                    {personalizedRecs.length > 0 ? "You're all caught up! Check the Weekly Review Kits for general study." : "No personalized recommendations yet—complete a few practice questions to get tailored suggestions."}
                   </p>
                 )}
-                {personalizedRecs
+                {filteredPersonalizedRecs
                   .filter(rec => !hiddenRecs.has(rec.material.id))
                   .map((rec) => {
                     const isLiked = likedRecs.has(rec.material.id);
@@ -589,29 +550,14 @@ export default function StudentCourseDetailPage() {
                             <span>Similarity {(rec.similarity_score * 100).toFixed(0)}%</span>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <button
-                              type="button"
-                              disabled={ratingInFlight === rec.material.id}
-                              className={`rounded-md border px-3 py-1 text-xs font-semibold transition-colors ${isLiked
-                                ? 'border-green-300 bg-white text-green-700 shadow-sm'
-                                : 'border-gray-200 text-gray-700 hover:border-indigo-200'
-                                }`}
-                              onClick={() => handleRateMaterial(rec.material.id, 1)}
-                            >
+                            <button type="button" disabled={ratingInFlight === rec.material.id} className={`rounded-md border px-3 py-1 text-xs font-semibold transition-colors ${isLiked ? 'border-green-300 bg-white text-green-700 shadow-sm' : 'border-gray-200 text-gray-700 hover:border-indigo-200'}`} onClick={() => handleRateMaterial(rec.material.id, 1)}>
                               {isLiked ? '✓ Saved' : '👍 Helpful'}
                             </button>
-                            <button
-                              type="button"
-                              disabled={ratingInFlight === rec.material.id}
-                              className="rounded-md border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
-                              onClick={() => handleRateMaterial(rec.material.id, -1)}
-                            >
+                            <button type="button" disabled={ratingInFlight === rec.material.id} className="rounded-md border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700" onClick={() => handleRateMaterial(rec.material.id, -1)}>
                               👎 Not for me
                             </button>
                             {ratings[rec.material.id] && (
-                              <span className="text-xs text-gray-400">
-                                {ratings[rec.material.id].upvotes}↑ / {ratings[rec.material.id].downvotes}↓
-                              </span>
+                              <span className="text-xs text-gray-400">{ratings[rec.material.id].upvotes}↑ / {ratings[rec.material.id].downvotes}↓</span>
                             )}
                           </div>
                         </div>
@@ -620,13 +566,20 @@ export default function StudentCourseDetailPage() {
                   })}
               </div>
             </section>
-
             {bundles.length > 0 && (
               <section className="rounded-2xl bg-white p-6 shadow-sm">
                 <header className="flex flex-col gap-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Study bundles</p>
-                  <h2 className="text-lg font-semibold text-gray-900">Catch-up kits per week</h2>
-                  <p className="text-sm text-gray-500">Each kit combines vetted resources to review the week quickly.</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📚</span>
+                    <div className="group relative">
+                      <h2 className="text-lg font-semibold text-gray-900 cursor-help border-b border-dotted border-gray-400">Weekly Review Kits</h2>
+                      <div className="absolute bottom-full left-0 mb-2 hidden w-64 rounded-lg bg-gray-800 p-2 text-xs text-white shadow-lg group-hover:block z-10">
+                        Complete collections of approved materials for each week, useful for general revision.
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500">Complete collections of approved materials for each week.</p>
                 </header>
                 <div className="mt-6 space-y-4">
                   {bundles.map((bundle) => (
@@ -641,14 +594,7 @@ export default function StudentCourseDetailPage() {
                       </div>
                       <div className="mt-4 space-y-2">
                         {bundle.materials.map((material) => (
-                          <a
-                            key={material.id}
-                            href={material.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:border-indigo-200"
-                            onClick={() => handleMaterialClick(material.id)}
-                          >
+                          <a key={material.id} href={material.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:border-indigo-200" onClick={() => handleMaterialClick(material.id)}>
                             <span>
                               <span className="font-medium text-gray-900">{material.title}</span>
                               <span className="ml-2 text-xs uppercase text-gray-400">{material.source}</span>
@@ -662,7 +608,6 @@ export default function StudentCourseDetailPage() {
                 </div>
               </section>
             )}
-
             <section className="rounded-2xl bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
@@ -689,14 +634,7 @@ export default function StudentCourseDetailPage() {
                     </div>
                     <div className="mt-4 space-y-2">
                       {topic.recommended_materials.map((material) => (
-                        <a
-                          key={material.id}
-                          href={material.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:border-indigo-200"
-                          onClick={() => handleMaterialClick(material.id)}
-                        >
+                        <a key={material.id} href={material.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:border-indigo-200" onClick={() => handleMaterialClick(material.id)}>
                           <span>
                             <span className="font-medium text-gray-900">{material.title}</span>
                             <span className="ml-2 text-xs uppercase text-gray-400">{material.source}</span>
@@ -716,19 +654,7 @@ export default function StudentCourseDetailPage() {
   );
 }
 
-function DetailStat({
-  label,
-  value,
-  subtext,
-  variant = "default",
-  tooltip,
-}: {
-  label: string;
-  value: string | number;
-  subtext: string;
-  variant?: "default" | "warning";
-  tooltip?: string;
-}) {
+function DetailStat({ label, value, subtext, variant = "default", tooltip }: { label: string; value: string | number; subtext: string; variant?: "default" | "warning"; tooltip?: string }) {
   const textClass = variant === "warning" ? "text-amber-600" : "text-gray-900";
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm" title={tooltip}>
@@ -741,16 +667,161 @@ function DetailStat({
 
 function formatStatusLabel(status: string) {
   switch (status) {
-    case "mastered":
-      return "Mastered";
-    case "proficient":
-      return "Proficient";
+    case "mastered": return "Mastered";
+    case "proficient": return "Proficient";
     case "learning":
-    case "in_progress":
-      return "In progress";
-    case "not_started":
-      return "Not started";
-    default:
-      return status.replace("_", " ");
+    case "in_progress": return "In progress";
+    case "not_started": return "Not started";
+    default: return status.replace("_", " ");
   }
+}
+
+type WeekCardMode = "overview" | "practice" | "tutor";
+
+function WeekCard({
+  week,
+  practiceResult,
+  tutorResponse,
+  onGenerateQuestions,
+  onAskTutor,
+  isGenerating,
+  isAskingTutor,
+}: {
+  week: WeeklyProgress;
+  practiceResult: PracticeQuestionsResponse | null;
+  tutorResponse: ExplainResponse | null;
+  onGenerateQuestions: () => void;
+  onAskTutor: () => void;
+  isGenerating: boolean;
+  isAskingTutor: boolean;
+}) {
+  const [mode, setMode] = useState<WeekCardMode>("overview");
+
+  useEffect(() => { if (practiceResult) setMode("practice"); }, [practiceResult]);
+  useEffect(() => { if (tutorResponse) setMode("tutor"); }, [tutorResponse]);
+
+  const statusClass = STATUS_COLOR[week.status] ?? STATUS_COLOR.default;
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
+      <div className="p-4 border-b border-gray-50">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Week {week.week_number}</p>
+            <p className="text-xs text-gray-500">{week.topic}</p>
+          </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
+            {formatStatusLabel(week.status)}
+          </span>
+        </div>
+      </div>
+      <div className="flex border-b border-gray-100 bg-gray-50/50 px-4">
+        <button onClick={() => setMode("overview")} className={`mr-4 border-b-2 py-3 text-xs font-medium transition-colors ${mode === "overview" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200"}`}>
+          Overview
+        </button>
+        <button onClick={() => setMode("practice")} className={`mr-4 border-b-2 py-3 text-xs font-medium transition-colors ${mode === "practice" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200"}`}>
+          Practice Quiz {practiceResult && "✓"}
+        </button>
+        <button onClick={() => setMode("tutor")} className={`border-b-2 py-3 text-xs font-medium transition-colors ${mode === "tutor" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200"}`}>
+          Tutor Insight {tutorResponse && "✓"}
+        </button>
+      </div>
+      <div className="p-4">
+        {mode === "overview" && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1"><span>📚</span> {week.materials_count} materials available</span>
+              <span className="flex items-center gap-1"><span>🏆</span> Score: {typeof week.score === "number" ? `${(week.score * 100).toFixed(0)}%` : "—"}</span>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-1 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-600">i</div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Ready to learn?</p>
+                  <p className="mt-1 text-xs text-gray-500">Switch to the <strong>Practice Quiz</strong> tab to generate questions or ask the AI Tutor for a summary in the <strong>Tutor Insight</strong> tab.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {mode === "practice" && (
+          <div>
+            {!practiceResult ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-2xl">📝</div>
+                <h3 className="text-sm font-semibold text-gray-900">Pop Quiz Time</h3>
+                <p className="mt-1 mb-6 max-w-sm text-xs text-gray-500">Generate a custom 5-question quiz to test your mastery of {week.topic}.</p>
+                <button type="button" onClick={onGenerateQuestions} disabled={isGenerating} className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-60 transition">
+                  {isGenerating ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Generating...</> : "Generate Questions"}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg bg-indigo-50 px-4 py-3 border border-indigo-100">
+                  <p className="text-sm font-semibold text-indigo-900">Practice set ({practiceResult.difficulty})</p>
+                  <button onClick={onGenerateQuestions} disabled={isGenerating} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline transition">
+                    {isGenerating ? "Refreshing..." : "Generate New Set ↻"}
+                  </button>
+                </div>
+                <ul className="space-y-4">
+                  {practiceResult.questions.map((question, index) => (
+                    <li key={index} className="rounded-lg border border-gray-100 p-4 transition hover:border-indigo-100 hover:bg-gray-50">
+                      <div className="flex gap-3">
+                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">{index + 1}</span>
+                        <p className="text-sm text-gray-800 leading-relaxed">{question.question}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+        {mode === "tutor" && (
+          <div>
+            {!tutorResponse ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-2xl">🤖</div>
+                <h3 className="text-sm font-semibold text-gray-900">AI Personal Tutor</h3>
+                <p className="mt-1 mb-6 max-w-sm text-xs text-gray-500">Stuck on a concept? Ask the AI to explain {week.topic} in simple terms.</p>
+                <button type="button" onClick={onAskTutor} disabled={isAskingTutor} className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 disabled:opacity-60 transition">
+                  {isAskingTutor ? "Thinking..." : "Explain This Topic"}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🤖</span>
+                    <p className="font-semibold text-gray-900">
+                      {practiceResult ? "Tutor Explanation (Based on Quiz)" : "Tutor Insight"}
+                    </p>
+                  </div>
+                  <button onClick={onAskTutor} disabled={isAskingTutor} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline transition">
+                    {isAskingTutor ? "Thinking..." : "Regenerate Answer ↻"}
+                  </button>
+                </div>
+                <div className="prose prose-sm max-w-none text-gray-700">
+                  <ReactMarkdown>{tutorResponse.explanation}</ReactMarkdown>
+                </div>
+                {tutorResponse.sources?.length ? (
+                  <div className="mt-4 rounded-lg bg-gray-50 p-3 text-xs">
+                    <p className="mb-2 font-semibold text-gray-500 uppercase tracking-wider text-[10px]">Sources</p>
+                    <div className="flex flex-wrap gap-2">
+                      {tutorResponse.sources.map((source, index) => (
+                        <a key={`${source.title}-${index}`} href={source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1 text-gray-600 hover:border-indigo-200 hover:text-indigo-600 hover:shadow-sm transition">
+                          <span className="truncate max-w-[150px]">{source.title}</span>
+                          <span className="text-gray-400">↗</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
