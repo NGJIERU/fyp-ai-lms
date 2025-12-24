@@ -69,7 +69,7 @@ export default function RegisterForm() {
           id="fullName"
           type="text"
           required
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-black bg-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
         />
@@ -87,7 +87,7 @@ export default function RegisterForm() {
           type="email"
           autoComplete="email"
           required
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-black bg-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
@@ -105,7 +105,7 @@ export default function RegisterForm() {
           type="password"
           autoComplete="new-password"
           required
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-black bg-white shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />

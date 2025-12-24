@@ -396,31 +396,41 @@ function SummaryCard({
 
 function CourseRow({ course }: { course: LecturerCourseStats }) {
   return (
-    <Link
-      href={`/lecturer/course/${course.course_id}`}
-      className="block rounded-xl border border-gray-100 bg-gray-50/70 p-4 transition hover:border-indigo-200 hover:bg-white"
-    >
+    <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 transition hover:border-indigo-200 hover:bg-white">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm uppercase tracking-wide text-indigo-600">{course.course_code}</p>
-          <h3 className="text-lg font-semibold text-gray-900">{course.course_name}</h3>
+        <Link href={`/lecturer/course/${course.course_id}`} className="group block">
+          <p className="text-sm uppercase tracking-wide text-indigo-600 group-hover:text-indigo-700">{course.course_code}</p>
+          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-indigo-700">{course.course_name}</h3>
           <p className="text-xs text-gray-500">
             {course.enrolled_students} students · {course.materials_count} materials
           </p>
-        </div>
+        </Link>
         <div className="flex flex-col items-start gap-2 sm:items-end">
           {course.pending_approvals > 0 && (
             <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
               {course.pending_approvals} pending approvals
             </span>
           )}
-          <span className="text-xs font-semibold text-indigo-600">View analytics →</span>
+          <div className="flex items-center gap-3 mt-1">
+            <Link
+              href={`/lecturer/course/${course.course_id}/students`}
+              className="text-xs font-semibold text-gray-600 hover:text-indigo-600 px-2 py-1 rounded hover:bg-white border border-transparent hover:border-gray-200 transition-all"
+            >
+              Manage Students
+            </Link>
+            <Link
+              href={`/lecturer/course/${course.course_id}`}
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+            >
+              View analytics →
+            </Link>
+          </div>
         </div>
       </div>
-      <div className="mt-4 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs text-gray-500 shadow-sm">
+      <Link href={`/lecturer/course/${course.course_id}`} className="mt-4 flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs text-gray-500 shadow-sm hover:bg-gray-50">
         <span>Class Avg Score</span>
         <span className="font-mono font-medium text-gray-900">{course.avg_class_score.toFixed(1)}%</span>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }
