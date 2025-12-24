@@ -165,7 +165,7 @@ export default function ChatInterface({ courseId, initialMessage, onClose }: Cha
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         placeholder="Type your question..."
-                        className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-12 text-sm focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-12 text-sm text-black focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         disabled={isLoading}
                     />
                     <button
