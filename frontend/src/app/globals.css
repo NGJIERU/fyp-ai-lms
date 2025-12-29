@@ -24,3 +24,31 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Ensure all input text is black for visibility - HIGH PRIORITY */
+input,
+textarea,
+select,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="number"] {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+/* Ensure placeholder text is visible but lighter */
+input::placeholder,
+textarea::placeholder {
+  color: #d1d5db !important;
+  /* Very light gray */
+  opacity: 0.7 !important;
+}
+
+/* Override any Tailwind text color classes */
+input.text-gray-900,
+textarea.text-gray-900,
+select.text-gray-900 {
+  color: #000000 !important;
+}

@@ -23,10 +23,13 @@ export default function UploadMaterialPage() {
     const [description, setDescription] = useState("");
     const [type, setType] = useState("pdf");
     const [courseId, setCourseId] = useState<number | "">("");
+    const [weekNumber, setWeekNumber] = useState<number>(1);  // NEW: Week number
     const [file, setFile] = useState<File | null>(null);
+    const [url, setUrl] = useState("");  // NEW: URL field
 
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);  // NEW: For URL analysis
 
     useEffect(() => {
         if (authLoading || !authorized) return;
@@ -50,10 +53,51 @@ export default function UploadMaterialPage() {
         if (e.target.files?.[0]) setFile(e.target.files[0]);
     };
 
+    const handleAnalyzeUrl = async () => {
+        if (!url.trim()) {
+            return setError("Please enter a URL first");
+        }
+
+        setIsAnalyzing(true);
+        setError(null);
+        const token = localStorage.getItem("access_token");
+
+        try {
+            const result = await apiFetch<{
+                title: string;
+                description: string;
+                type: string;
+                confidence: number;
+            }>("/api/v1/lecturer/materials/analyze-url", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ url: url.trim() }),
+            });
+
+            // Auto-fill form fields with AI suggestions
+            setTitle(result.title);
+            setDescription(result.description);
+            setType(result.type);
+        } catch (err: any) {
+            setError(err.message || "Failed to analyze URL");
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        if (!file) return setError("Please select a file");
-        if (!courseId) return setError("Please select a course");
+
+        // Validate: must have either file OR URL
+        if (!file && !url.trim()) {
+            return setError("Please either upload a file or provide a URL");
+        }
+        if (file && url.trim()) {
+            return setError("Please provide either a file OR a URL, not both");
+        }
+        if (!courseId) {
+            return setError("Please select a course");
+        }
 
         setIsSubmitting(true);
         setError(null);
@@ -64,7 +108,14 @@ export default function UploadMaterialPage() {
         form.append("description", description);
         form.append("type", type);
         form.append("course_id", String(courseId));
-        form.append("file", file);
+        form.append("week_number", String(weekNumber));  // NEW: Include week number
+
+        // Add file OR URL
+        if (file) {
+            form.append("file", file);
+        } else if (url.trim()) {
+            form.append("url", url.trim());
+        }
 
         try {
             await apiFetch<any>("/api/v1/lecturer/materials/", {
@@ -119,7 +170,7 @@ export default function UploadMaterialPage() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Target Course</label>
                                 <select
@@ -129,6 +180,19 @@ export default function UploadMaterialPage() {
                                 >
                                     {courses.map(c => (
                                         <option key={c.course_id} value={c.course_id}>{c.course_code} - {c.course_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Week Number</label>
+                                <select
+                                    value={weekNumber}
+                                    onChange={(e) => setWeekNumber(Number(e.target.value))}
+                                    className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                >
+                                    {Array.from({ length: 14 }, (_, i) => i + 1).map(week => (
+                                        <option key={week} value={week}>Week {week}</option>
                                     ))}
                                 </select>
                             </div>
@@ -159,6 +223,54 @@ export default function UploadMaterialPage() {
                                 rows={3}
                                 className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Resource URL (Optional)</label>
+                            <div className="mt-1 flex gap-2">
+                                <input
+                                    type="url"
+                                    placeholder="e.g., https://www.youtube.com/watch?v=... or https://example.com/article"
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleAnalyzeUrl}
+                                    disabled={isAnalyzing || !url.trim()}
+                                    className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                >
+                                    {isAnalyzing ? (
+                                        <>
+                                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Analyzing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                            </svg>
+                                            Analyze URL
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">
+                                Click "Analyze URL" to auto-fill title, description, and type using AI
+                            </p>
+                        </div>
+
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                <div className="w-full border-t border-gray-200" />
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="bg-white px-2 text-gray-500">OR</span>
+                            </div>
                         </div>
 
                         <div>
