@@ -954,7 +954,9 @@ def get_course_week_analytics(
             .first()
         )
         
-        avg_score = (stats.avg_score or 0) * 100
+        # average_score is already stored as 0-100 percentage in database
+        # (see ai_tutor.py line 396: current_score_pct = ... * 100)
+        avg_score = stats.avg_score or 0
         attempts = stats.total_attempts or 0
         
         # Common mistakes would come from analyzing quiz attempts
