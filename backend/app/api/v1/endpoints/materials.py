@@ -12,8 +12,12 @@ router = APIRouter()
 
 # Dependency to get CrawlerManager (singleton-ish)
 _crawler_manager = CrawlerManager()
-# Register crawlers here (e.g., _crawler_manager.register_crawler(YouTubeCrawler()))
-# For now, no crawlers are registered.
+
+# Register crawlers
+from app.services.crawler import YouTubeCrawler, GitHubCrawler, ArxivCrawler
+_crawler_manager.register_crawler(YouTubeCrawler())
+_crawler_manager.register_crawler(GitHubCrawler())
+_crawler_manager.register_crawler(ArxivCrawler())
 
 def get_crawler_manager():
     return _crawler_manager

@@ -39,7 +39,7 @@ export default function Home() {
               Get Started
             </Link>
             <Link
-              href="http://localhost:8000/docs"
+              href="/api/docs"
               target="_blank"
               className="px-10 py-4 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-zinc-800 rounded-xl text-lg font-semibold transition-all duration-300 shadow-sm"
             >

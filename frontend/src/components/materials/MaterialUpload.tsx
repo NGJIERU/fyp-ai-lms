@@ -78,7 +78,7 @@ export default function MaterialUpload({ courseId, onUploadSuccess, initialWeek 
                     formData.append('description', files[0].description);
                 }
 
-                const response = await fetch(`http://localhost:8000/api/v1/courses/${courseId}/materials/upload`, {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/courses/${courseId}/materials/upload`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -101,7 +101,7 @@ export default function MaterialUpload({ courseId, onUploadSuccess, initialWeek 
                 formData.append('titles', JSON.stringify(files.map(f => f.title)));
                 formData.append('descriptions', JSON.stringify(files.map(f => f.description)));
 
-                const response = await fetch(`http://localhost:8000/api/v1/courses/${courseId}/materials/upload-batch`, {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/courses/${courseId}/materials/upload-batch`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`

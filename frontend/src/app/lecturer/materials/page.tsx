@@ -1,6 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+export const dynamic = "force-dynamic";
+
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { apiFetch } from "@/lib/api";
@@ -37,7 +39,7 @@ type PendingMaterial = {
   } | null;
 };
 
-export default function MaterialsApprovalPage() {
+function MaterialsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { loading: authLoading, authorized } = useRequireRole(["lecturer", "super_admin"]);
@@ -506,5 +508,23 @@ export default function MaterialsApprovalPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function MaterialsApprovalPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 px-4 py-10">
+          <div className="mx-auto max-w-6xl">
+            <div className="rounded-xl bg-white p-6 shadow-sm">
+              <p className="text-sm text-gray-500">Loading page...</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <MaterialsContent />
+    </Suspense>
   );
 }

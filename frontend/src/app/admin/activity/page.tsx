@@ -122,7 +122,13 @@ export default function AdminActivityPage() {
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-gray-600">
-                                        {log.resource_type ? `${log.resource_type} #${log.resource_id}` : "-"}
+                                        {log.resource_type && log.resource_id
+                                            ? `${log.resource_type} #${log.resource_id}`
+                                            : log.resource_type === 'system'
+                                                ? '-'
+                                                : log.resource_type
+                                                    ? log.resource_type
+                                                    : '-'}
                                     </td>
                                 </tr>
                             ))}

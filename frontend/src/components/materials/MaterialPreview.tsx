@@ -24,7 +24,7 @@ export default function MaterialPreview({ material, courseId, onClose }: Materia
             try {
                 const token = localStorage.getItem('token');
                 const response = await fetch(
-                    `http://localhost:8000/api/v1/courses/${courseId}/materials/${material.id}/download`,
+                    `${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/courses/${courseId}/materials/${material.id}/download`,
                     {
                         headers: {
                             'Authorization': `Bearer ${token}`

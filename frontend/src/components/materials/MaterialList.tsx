@@ -45,7 +45,7 @@ export default function MaterialList({ courseId, refreshTrigger, weekNumber }: M
             setError(null);
             const token = localStorage.getItem('token');
 
-            let url = `http://localhost:8000/api/v1/courses/${courseId}/materials`;
+            let url = `${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/courses/${courseId}/materials`;
             if (weekNumber) {
                 url += `?week_number=${weekNumber}`;
             }
@@ -78,7 +78,7 @@ export default function MaterialList({ courseId, refreshTrigger, weekNumber }: M
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(
-                `http://localhost:8000/api/v1/courses/${courseId}/materials/${material.id}/download`,
+                `${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/courses/${courseId}/materials/${material.id}/download`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -113,7 +113,7 @@ export default function MaterialList({ courseId, refreshTrigger, weekNumber }: M
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(
-                `http://localhost:8000/api/v1/courses/${courseId}/materials/${materialId}`,
+                `${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/courses/${courseId}/materials/${materialId}`,
                 {
                     method: 'DELETE',
                     headers: {

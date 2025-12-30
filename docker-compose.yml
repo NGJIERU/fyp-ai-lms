@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   # Reverse Proxy
@@ -42,6 +42,7 @@ services:
       - USE_OPENAI_TUTOR=true
       - USE_OPENAI_EMBEDDINGS=false
       - AI_TUTOR_MODEL=gpt-4o
+      - OPENAI_API_KEY=sk-your-openai-api-key-here
       # Ensure CORS allows the nginx proxy origin
       - BACKEND_CORS_ORIGINS=["http://localhost", "http://127.0.0.1"]
     networks:
