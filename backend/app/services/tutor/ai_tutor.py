@@ -746,6 +746,7 @@ Response:"""
         
         if not context:
             context = "No specific course materials found for this query in the database."
+            logger.warning(f"RAG context retrieval empty for prompt: {prompt[:50]}...")
 
         # 2. Return context-aware responses based on prompt type
         prompt_lower = prompt.lower()
