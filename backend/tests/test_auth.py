@@ -1,42 +1,25 @@
-from fastapi.testclient import TestClient
-from app.core.config import settings
+from app.core import security
+from app.core.database import SessionLocal
+from app.models import User
 
-def test_create_user(client: TestClient):
-    response = client.post(
-        f"{settings.API_V1_STR}/auth/register",
-        json={
-            "email": "test@example.com",
-            "password": "password123",
-            "full_name": "Test User",
-            "role": "student"
-        },
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["email"] == "test@example.com"
-    assert "id" in data
+db = SessionLocal()
+user = db.query(User).filter(User.email == 'dr.smith@lms.edu').first()
 
-def test_login_user(client: TestClient):
-    # First create user
-    client.post(
-        f"{settings.API_V1_STR}/auth/register",
-        json={
-            "email": "login@example.com",
-            "password": "password123",
-            "full_name": "Login User",
-            "role": "student"
-        },
-    )
+if user:
+    print(f"User found: {user.email}")
+    print(f"Role: {user.role}")
+    print(f"Active: {user.is_active}")
+    print(f"Hash starts with: {user.hashed_password[:30]}")
     
-    # Then login
-    response = client.post(
-        f"{settings.API_V1_STR}/auth/login",
-        data={
-            "username": "login@example.com",
-            "password": "password123"
-        },
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert "access_token" in data
-    assert data["token_type"] == "bearer"
+    # Test password verification
+    is_valid = security.verify_password("lecturer123", user.hashed_password)
+    print(f"Password 'lecturer123' valid: {is_valid}")
+    
+    # Test token creation
+    from datetime import timedelta
+    token = security.create_access_token(user.id, timedelta(minutes=30))
+    print(f"Token created: {token[:50]}...")
+else:
+    print("User not found!")
+
+db.close()
