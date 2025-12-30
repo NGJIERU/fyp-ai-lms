@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 if (!API_BASE) {
   console.warn("NEXT_PUBLIC_API_BASE_URL is not set");
@@ -18,7 +18,14 @@ export async function apiFetch<T>(
     ...(options?.headers ?? {}),
   };
 
-  const res = await fetch(`${API_BASE}${path}`, {
+  // Handle double-slash issues or double-prefixing
+  // If API_BASE is /api/v1 and path starts with /api/v1, strip one
+  let url = `${API_BASE}${path}`;
+  if (API_BASE && path.startsWith(API_BASE)) {
+    url = path; // Path already includes base
+  }
+
+  const res = await fetch(url, {
     ...options,
     headers,
   });

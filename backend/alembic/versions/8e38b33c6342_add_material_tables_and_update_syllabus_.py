@@ -10,6 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from sqlalchemy import JSON
 
 # revision identifiers, used by Alembic.
 revision: str = '8e38b33c6342'
@@ -46,7 +47,7 @@ def upgrade() -> None:
     sa.Column('snippet', sa.Text(), nullable=True),
     sa.Column('quality_score', sa.Float(), nullable=False),
     sa.Column('content_hash', sa.String(length=64), nullable=False),
-    sa.Column('embedding', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('embedding', sa.JSON(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint('quality_score >= 0.0 AND quality_score <= 1.0', name='check_quality_score_range'),

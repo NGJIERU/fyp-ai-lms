@@ -24,15 +24,14 @@ export default function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      // Use apiFetch instead of direct fetch to avoid double URL issues
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",

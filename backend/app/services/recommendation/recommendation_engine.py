@@ -450,7 +450,12 @@ class RecommendationEngine:
             reasons.append("Topic not attempted yet.")
 
         if performance.last_attempt_at:
-            days_since = max(0, (now - performance.last_attempt_at).days)
+            # Ensure last_attempt_at is timezone-aware
+            last_attempt = performance.last_attempt_at
+            if last_attempt.tzinfo is None:
+                last_attempt = last_attempt.replace(tzinfo=timezone.utc)
+            
+            days_since = max(0, (now - last_attempt).days)
             recency_boost = self.PERSONALIZATION_RECENCY_WEIGHT / (1 + days_since / 3)
             adjusted_score += recency_boost
             if days_since == 0:

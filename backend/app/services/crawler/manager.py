@@ -21,10 +21,12 @@ class CrawlerManager:
 
     def register_crawler(self, crawler: BaseCrawler):
         """Register a crawler instance"""
-        self.crawlers[crawler.source_name] = crawler
+        # Store with lowercase key for case-insensitive lookup
+        self.crawlers[crawler.source_name.lower()] = crawler
 
     def get_crawler(self, source_name: str) -> BaseCrawler:
-        return self.crawlers.get(source_name)
+        # Lookup with lowercase for case-insensitive matching
+        return self.crawlers.get(source_name.lower())
 
     async def run_crawler(self, source_name: str, query: str, limit: int = 10):
         """
