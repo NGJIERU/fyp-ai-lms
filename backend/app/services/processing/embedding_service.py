@@ -54,8 +54,11 @@ class EmbeddingService:
     def _init_local(self):
         """Initialize local sentence-transformers model."""
         try:
+            import torch
             from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer(self.model_name)
+            # Force CPU device to avoid meta tensor issues
+            device = "cpu"
+            self.model = SentenceTransformer(self.model_name, device=device)
             self.embedding_dim = self.model.get_sentence_embedding_dimension()
             logger.info(f"Loaded local embedding model: {self.model_name} ({self.embedding_dim} dims)")
         except ImportError:
@@ -66,7 +69,7 @@ class EmbeddingService:
             logger.info("Falling back to default model: all-MiniLM-L6-v2")
             try:
                 self.model_name = "all-MiniLM-L6-v2"
-                self.model = SentenceTransformer(self.model_name)
+                self.model = SentenceTransformer(self.model_name, device="cpu")
                 self.embedding_dim = self.model.get_sentence_embedding_dimension()
                 logger.info(f"Loaded fallback local embedding model: {self.model_name} ({self.embedding_dim} dims)")
             except Exception as fallback_error:
