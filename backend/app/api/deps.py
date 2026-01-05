@@ -24,13 +24,30 @@ def get_current_user(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         token_data = token_schemas.TokenPayload(**payload)
-    except (JWTError, ValueError):
+    except (JWTError, ValueError) as e:
+        with open("debug_deps.txt", "a") as f:
+            f.write(f"Auth Token Error: {e}\n")
         raise credentials_exception
-    
-    user = db.query(models.User).filter(models.User.id == token_data.sub).first()
-    if not user:
-        raise credentials_exception
-    return user
+    except Exception as e:
+        with open("debug_deps.txt", "a") as f:
+            f.write(f"Auth Unexpected Error: {e}\n")
+            import traceback
+            traceback.print_exc(file=f)
+        raise
+
+    try:
+        user = db.query(models.User).filter(models.User.id == token_data.sub).first()
+        if not user:
+            with open("debug_deps.txt", "a") as f:
+                f.write(f"Auth User Not Found: ID {token_data.sub}\n")
+            raise credentials_exception
+        return user
+    except Exception as e:
+         with open("debug_deps.txt", "a") as f:
+            f.write(f"Auth DB Lookup Error: {e}\n")
+            import traceback
+            traceback.print_exc(file=f)
+         raise
 
 def get_current_active_user(
     current_user: models.User = Depends(get_current_user),

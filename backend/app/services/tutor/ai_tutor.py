@@ -95,24 +95,49 @@ Create a summary that:
 
 Summary:""",
 
-        "generate_questions": """You are an AI tutor generating practice questions.
-Based on the following topic and materials, generate practice questions.
+        "generate_questions": """You are an AI tutor generating structured practice questions.
+Based on the topic and materials, generate multiple-choice questions (MCQs) in JSON format.
 
 Topic: {topic}
-Difficulty level: {difficulty}
+Cognitive Level: {cognitive_level}
+Number of questions: {num_questions}
 
 Course Materials Context:
 {context}
 
-Generate {num_questions} practice questions that:
-1. Test understanding of key concepts
-2. Include a mix of question types (conceptual, application, analysis)
-3. Are appropriate for the specified difficulty level
-4. Have clear, unambiguous answers
+BLOOM'S TAXONOMY LEVELS (use the specified cognitive_level):
+- remember: Recall facts, terms, basic concepts (e.g., "What is...", "Define...", "List...")
+- understand: Explain ideas, interpret meaning (e.g., "Explain why...", "Summarize...", "Compare...")  
+- apply: Use information in new situations (e.g., "Calculate...", "Solve...", "Implement...")
+- analyze: Break down into parts, identify patterns (e.g., "Why does...", "What is the relationship...")
+- evaluate: Justify decisions, critique (e.g., "Which approach is best...", "Evaluate...")
+- create: Produce new ideas, design solutions (e.g., "Design...", "Propose...", "What if...")
 
-IMPORTANT: Format each question as a numbered list item (e.g., "1. Question text"). Do not include any introductory or concluding text.
+DISTRACTOR GUIDELINES:
+- Option A-D should all be plausible to someone who hasn't mastered the topic
+- Wrong answers should reflect common misconceptions or partial understanding
+- Avoid obviously wrong answers that can be eliminated without knowledge
 
-Questions:""",
+OUTPUT FORMAT - Return ONLY a valid JSON array, no other text:
+```json
+[
+  {{
+    "question": "Clear question text here?",
+    "options": {{
+      "A": "First option",
+      "B": "Second option", 
+      "C": "Third option",
+      "D": "Fourth option"
+    }},
+    "correct_answer": "B",
+    "explanation": "Why B is correct and why other options are wrong",
+    "cognitive_level": "{cognitive_level}",
+    "distractors_rationale": "Why the wrong options are plausible misconceptions"
+  }}
+]
+```
+
+Generate exactly {num_questions} questions following this JSON format.""",
 
         "chat": """You are an AI Personal Tutor having a conversation with a university student.
 Your goal is to be helpful, encouraging, and educational, **but you must adhere to strict academic integrity guidelines.**
@@ -146,8 +171,9 @@ Response:"""
     
     def __init__(
         self,
-        openai_api_key: Optional[str] = None,
+        api_key: Optional[str] = None,
         model: Optional[str] = None,
+        use_huggingface: Optional[bool] = None,
         use_openai: Optional[bool] = None,
         rag_pipeline: Optional[RAGPipeline] = None
     ):
@@ -155,18 +181,30 @@ Response:"""
         Initialize the AI Tutor.
         
         Args:
-            openai_api_key: OpenAI API key
+            api_key: API key (HuggingFace token or OpenAI key)
             model: LLM model to use
-            use_openai: Force enable/disable OpenAI usage
+            use_huggingface: Force enable/disable HuggingFace usage
+            use_openai: Force enable/disable OpenAI usage (fallback)
             rag_pipeline: Injected RAG pipeline (mainly for testing)
         """
+        # Determine which LLM provider to use (HuggingFace takes priority)
+        self.use_huggingface = settings.USE_HUGGINGFACE_TUTOR if use_huggingface is None else use_huggingface
         self.use_openai = settings.USE_OPENAI_TUTOR if use_openai is None else use_openai
-        if self.use_openai:
-            self.api_key = openai_api_key or settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
+        
+        # Set API key and model based on provider
+        if self.use_huggingface:
+            self.api_key = api_key or settings.HUGGINGFACE_API_TOKEN or os.getenv("HUGGINGFACE_API_TOKEN")
+            self.model = model or settings.HUGGINGFACE_MODEL
+            self.provider = "huggingface"
+        elif self.use_openai:
+            self.api_key = api_key or settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
+            self.model = model or settings.AI_TUTOR_MODEL
+            self.provider = "openai"
         else:
             self.api_key = None
+            self.model = None
+            self.provider = "mock"
 
-        self.model = model or settings.AI_TUTOR_MODEL
         self.rag_pipeline = rag_pipeline or RAGPipeline(
             embedding_service=get_embedding_service(
                 model_name=settings.EMBEDDING_MODEL_NAME,
@@ -177,17 +215,38 @@ Response:"""
         self.answer_checker = AnswerChecker()
         self.llm_client = None
         
-        if self.use_openai and self.api_key:
+        if self.api_key and self.provider != "mock":
             self._init_llm_client()
         else:
-            logger.info("AI Tutor running in mock mode (OpenAI disabled or missing API key)")
+            logger.info("AI Tutor running in mock mode (no API key configured)")
     
     def _init_llm_client(self):
-        """Initialize the LLM client."""
-        logger.info(f"Attempting to initialize OpenAI client with model: {self.model}, API key present: {bool(self.api_key)}")
+        """Initialize the LLM client based on the configured provider."""
+        if self.provider == "huggingface":
+            self._init_huggingface_client()
+        elif self.provider == "openai":
+            self._init_openai_client()
+    
+    def _init_huggingface_client(self):
+        """Initialize the HuggingFace InferenceClient."""
+        logger.info(f"Attempting to initialize HuggingFace client with model: {self.model}")
+        try:
+            from huggingface_hub import InferenceClient
+            self.llm_client = InferenceClient(
+                model=self.model,
+                token=self.api_key
+            )
+            logger.info(f"✅ Initialized HuggingFace InferenceClient with model {self.model}")
+        except ImportError as e:
+            logger.error(f"❌ huggingface_hub package not installed: {e}")
+        except Exception as e:
+            logger.error(f"❌ Error initializing HuggingFace client: {e}", exc_info=True)
+    
+    def _init_openai_client(self):
+        """Initialize the OpenAI client (fallback)."""
+        logger.info(f"Attempting to initialize OpenAI client with model: {self.model}")
         try:
             from openai import OpenAI
-            logger.info("OpenAI package imported successfully")
             self.llm_client = OpenAI(api_key=self.api_key)
             logger.info(f"✅ Initialized OpenAI client with model {self.model}")
         except ImportError as e:
@@ -538,10 +597,17 @@ Response:"""
             week_number: Week number
             num_questions: Number of questions to generate
             difficulty: Difficulty level (easy, medium, hard)
-            
-        Returns:
+                    Returns:
             Generated practice questions
         """
+        # Map difficulty to Bloom's taxonomy cognitive levels
+        DIFFICULTY_TO_COGNITIVE = {
+            "easy": "remember",
+            "medium": "apply", 
+            "hard": "analyze"
+        }
+        cognitive_level = DIFFICULTY_TO_COGNITIVE.get(difficulty, "understand")
+        
         # Get syllabus topic
         syllabus = (
             db.query(Syllabus)
@@ -569,20 +635,31 @@ Response:"""
         
         prompt = self.PROMPTS["generate_questions"].format(
             topic=syllabus.topic,
-            difficulty=difficulty,
+            cognitive_level=cognitive_level,
             context=context_str,
             num_questions=num_questions
         )
         
         questions_text = self._call_llm(prompt)
         
-        # Parse questions (simple parsing - could be improved)
-        questions = self._parse_generated_questions(questions_text)
+        # Parse questions - try JSON first, fallback to regex
+        questions = self._parse_mcq_json(questions_text)
+        if not questions:
+            logger.warning("JSON parsing failed, falling back to regex parser")
+            questions = self._parse_generated_questions(questions_text)
+            if not questions:
+                logger.error(f"Failed to generate questions - LLM returned no parseable content. Raw text: {questions_text[:500]}...")
+        
+        # If still no questions, return error
+        if not questions:
+            logger.error("Failed to generate questions - LLM returned no parseable content")
+            return {"error": "Failed to generate questions. Please try again."}
         
         return {
             "topic": syllabus.topic,
             "week_number": week_number,
             "difficulty": difficulty,
+            "cognitive_level": cognitive_level,
             "questions": questions,
             "sources": [c["title"] for c in context_chunks]
         }
@@ -709,19 +786,40 @@ Response:"""
             return self._get_mock_response(prompt)
         
         try:
-            response = self.llm_client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful AI tutor for university students."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=1500,
-                temperature=0.7
-            )
-            return response.choices[0].message.content
+            if self.provider == "huggingface":
+                return self._call_huggingface(prompt)
+            else:
+                return self._call_openai(prompt)
         except Exception as e:
             logger.error(f"LLM call error: {e}")
             return self._get_mock_response(prompt)
+    
+    def _call_huggingface(self, prompt: str) -> str:
+        """Call the HuggingFace Inference API."""
+        messages = [
+            {"role": "system", "content": "You are a helpful AI tutor for university students."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = self.llm_client.chat_completion(
+            messages=messages,
+            max_tokens=1500,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+    
+    def _call_openai(self, prompt: str) -> str:
+        """Call the OpenAI API (fallback)."""
+        response = self.llm_client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are a helpful AI tutor for university students."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1500,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
     
     def _get_mock_response(self, prompt: str) -> str:
         """
@@ -810,6 +908,85 @@ Here is the start of the material content:
 *(Full summarization requires active AI connection)*"""
 
         return "Offline Mode: Unable to process request without AI connection."
+    
+    def _parse_mcq_json(self, text: str) -> List[Dict[str, Any]]:
+        """
+        Parse MCQ questions from JSON format.
+        
+        Args:
+            text: LLM response text (may contain markdown code blocks)
+            
+        Returns:
+            List of validated MCQ dictionaries, or empty list if parsing fails
+        """
+        import json
+        import re
+        
+        try:
+            # Try to extract JSON from markdown code blocks
+            json_match = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', text)
+            if json_match:
+                json_str = json_match.group(1).strip()
+            else:
+                # Try to find raw JSON array
+                json_match = re.search(r'\[\s*\{[\s\S]*\}\s*\]', text)
+                if json_match:
+                    json_str = json_match.group(0)
+                else:
+                    logger.warning("No JSON found in LLM response")
+                    return []
+            
+            # Parse JSON
+            questions = json.loads(json_str)
+            
+            if not isinstance(questions, list):
+                logger.warning("Parsed JSON is not a list")
+                return []
+            
+            # Validate and normalize each question
+            validated_questions = []
+            for q in questions:
+                if not isinstance(q, dict):
+                    continue
+                    
+                # Check required fields
+                if "question" not in q or "options" not in q or "correct_answer" not in q:
+                    logger.warning(f"Question missing required fields: {q.keys()}")
+                    continue
+                
+                # Normalize options to ensure A, B, C, D format
+                options = q.get("options", {})
+                if isinstance(options, dict):
+                    # Already in dict format
+                    normalized_options = options
+                elif isinstance(options, list):
+                    # Convert list to dict
+                    normalized_options = {
+                        chr(65 + i): opt for i, opt in enumerate(options[:4])
+                    }
+                else:
+                    continue
+                
+                validated_q = {
+                    "question": q["question"],
+                    "options": normalized_options,
+                    "correct_answer": q["correct_answer"].upper() if isinstance(q["correct_answer"], str) else q["correct_answer"],
+                    "explanation": q.get("explanation", ""),
+                    "cognitive_level": q.get("cognitive_level", "understand"),
+                    "distractors_rationale": q.get("distractors_rationale", ""),
+                    "type": "mcq"
+                }
+                validated_questions.append(validated_q)
+            
+            logger.info(f"Successfully parsed {len(validated_questions)} MCQ questions from JSON")
+            return validated_questions
+            
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON decode error: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Error parsing MCQ JSON: {e}")
+            return []
     
     def _parse_generated_questions(self, text: str) -> List[Dict[str, Any]]:
         """Parse generated questions text into structured format."""

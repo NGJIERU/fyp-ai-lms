@@ -59,6 +59,7 @@ export default function QuizModal({
                     // or we might need to modify backend to accept topic override.
                     // For now, let's rely on week_number as per API spec.
                 }),
+                timeout: 90000, // 90 second timeout for LLM generation
             });
 
             // 2. Parse questions

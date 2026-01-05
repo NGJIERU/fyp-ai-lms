@@ -304,6 +304,7 @@ export default function StudentCourseDetailPage() {
             num_questions: 5,
             difficulty: "medium",
           }),
+          timeout: 90000, // 90 second timeout for LLM generation
         }
       );
       setPracticeResults((prev) => ({

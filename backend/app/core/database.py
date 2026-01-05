@@ -13,6 +13,13 @@ Base = declarative_base()
 def get_db():
     db = SessionLocal()
     try:
+        # Log successful creation (verbose, but necessary temporarily)
+        # with open("debug_deps.txt", "a") as f:
+        #    f.write(f"DB Session created: {db}\n")
         yield db
+    except Exception as e:
+        with open("debug_deps.txt", "a") as f:
+            f.write(f"DB Session Yield Error: {e}\n")
+        raise
     finally:
         db.close()

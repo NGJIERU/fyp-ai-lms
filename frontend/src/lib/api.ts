@@ -4,9 +4,13 @@ if (!API_BASE) {
   console.warn("NEXT_PUBLIC_API_BASE_URL is not set");
 }
 
+interface ApiFetchOptions extends RequestInit {
+  timeout?: number; // Timeout in milliseconds
+}
+
 export async function apiFetch<T>(
   path: string,
-  options?: RequestInit
+  options?: ApiFetchOptions
 ): Promise<T> {
   // Auto-include auth token if available
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
@@ -25,39 +29,49 @@ export async function apiFetch<T>(
     url = path; // Path already includes base
   }
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-  });
+  // Setup timeout with AbortController
+  const timeout = options?.timeout ?? 30000; // Default 30s
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  const contentType = res.headers.get("content-type") ?? "";
-  const isJson = contentType.includes("application/json");
-  const bodyText = await res.text();
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    let message = res.statusText;
-    if (isJson && bodyText) {
+    const contentType = res.headers.get("content-type") ?? "";
+    const isJson = contentType.includes("application/json");
+    const bodyText = await res.text();
+
+    if (!res.ok) {
+      let message = res.statusText;
+      if (isJson && bodyText) {
+        try {
+          const data = JSON.parse(bodyText) as any;
+          if (data?.detail) message = data.detail;
+        } catch {
+          // ignore JSON parse errors
+        }
+      }
+      throw new Error(message || "Request failed");
+    }
+
+    if (!bodyText.trim()) {
+      return undefined as T;
+    }
+
+    if (isJson) {
       try {
-        const data = JSON.parse(bodyText) as any;
-        if (data?.detail) message = data.detail;
+        return JSON.parse(bodyText) as T;
       } catch {
         // ignore JSON parse errors
       }
     }
-    throw new Error(message || "Request failed");
-  }
 
-  if (!bodyText.trim()) {
     return undefined as T;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  if (isJson) {
-    try {
-      return JSON.parse(bodyText) as T;
-    } catch {
-      // ignore JSON parse errors
-    }
-  }
-
-  return undefined as T;
 }
