@@ -95,49 +95,29 @@ Create a summary that:
 
 Summary:""",
 
-        "generate_questions": """You are an AI tutor generating structured practice questions.
-Based on the topic and materials, generate multiple-choice questions (MCQs) in JSON format.
-
-Topic: {topic}
-Cognitive Level: {cognitive_level}
-Number of questions: {num_questions}
-
-Course Materials Context:
-{context}
-
-BLOOM'S TAXONOMY LEVELS (use the specified cognitive_level):
-- remember: Recall facts, terms, basic concepts (e.g., "What is...", "Define...", "List...")
-- understand: Explain ideas, interpret meaning (e.g., "Explain why...", "Summarize...", "Compare...")  
-- apply: Use information in new situations (e.g., "Calculate...", "Solve...", "Implement...")
-- analyze: Break down into parts, identify patterns (e.g., "Why does...", "What is the relationship...")
-- evaluate: Justify decisions, critique (e.g., "Which approach is best...", "Evaluate...")
-- create: Produce new ideas, design solutions (e.g., "Design...", "Propose...", "What if...")
-
-DISTRACTOR GUIDELINES:
-- Option A-D should all be plausible to someone who hasn't mastered the topic
-- Wrong answers should reflect common misconceptions or partial understanding
-- Avoid obviously wrong answers that can be eliminated without knowledge
-
-OUTPUT FORMAT - Return ONLY a valid JSON array, no other text:
-```json
-[
-  {{
-    "question": "Clear question text here?",
-    "options": {{
-      "A": "First option",
-      "B": "Second option", 
-      "C": "Third option",
-      "D": "Fourth option"
-    }},
-    "correct_answer": "B",
-    "explanation": "Why B is correct and why other options are wrong",
-    "cognitive_level": "{cognitive_level}",
-    "distractors_rationale": "Why the wrong options are plausible misconceptions"
-  }}
-]
-```
-
-Generate exactly {num_questions} questions following this JSON format.""",
+        "generate_questions": """You are an expert university tutor. 
+        Create {num_questions} multiple-choice practice questions based on the course materials below.
+        
+        Assessment Goal: Test {cognitive_level} understanding of {topic}.
+        
+        STRICT JSON OUTPUT FORMAT REQUIRED:
+        [
+            {{
+                "question": "Question text here?",
+                "options": {{
+                    "A": "Option A text",
+                    "B": "Option B text",
+                    "C": "Option C text",
+                    "D": "Option D text"
+                }},
+                "correct_answer": "A",
+                "explanation": "Brief explanation of why A is correct."
+            }}
+        ]
+        
+        Course Materials Context:
+        {context}
+        """,
 
         "chat": """You are an AI Personal Tutor having a conversation with a university student.
 Your goal is to be helpful, encouraging, and educational, **but you must adhere to strict academic integrity guidelines.**
@@ -187,12 +167,17 @@ Response:"""
             use_openai: Force enable/disable OpenAI usage (fallback)
             rag_pipeline: Injected RAG pipeline (mainly for testing)
         """
-        # Determine which LLM provider to use (HuggingFace takes priority)
+        # Determine which LLM provider to use (Gemini > HuggingFace > OpenAI)
+        self.use_gemini = settings.USE_GEMINI_TUTOR if getattr(settings, "USE_GEMINI_TUTOR", False) else False
         self.use_huggingface = settings.USE_HUGGINGFACE_TUTOR if use_huggingface is None else use_huggingface
         self.use_openai = settings.USE_OPENAI_TUTOR if use_openai is None else use_openai
         
         # Set API key and model based on provider
-        if self.use_huggingface:
+        if self.use_gemini:
+             self.api_key = getattr(settings, "GEMINI_API_KEY", None) or os.getenv("GEMINI_API_KEY")
+             self.model = getattr(settings, "GEMINI_MODEL", "gemini-1.5-flash")
+             self.provider = "gemini"
+        elif self.use_huggingface:
             self.api_key = api_key or settings.HUGGINGFACE_API_TOKEN or os.getenv("HUGGINGFACE_API_TOKEN")
             self.model = model or settings.HUGGINGFACE_MODEL
             self.provider = "huggingface"
@@ -218,14 +203,29 @@ Response:"""
         if self.api_key and self.provider != "mock":
             self._init_llm_client()
         else:
-            logger.info("AI Tutor running in mock mode (no API key configured)")
+            logger.info(f"AI Tutor running in {self.provider} mode (no API key configured)")
     
     def _init_llm_client(self):
         """Initialize the LLM client based on the configured provider."""
-        if self.provider == "huggingface":
+        if self.provider == "gemini":
+            self._init_gemini_client()
+        elif self.provider == "huggingface":
             self._init_huggingface_client()
         elif self.provider == "openai":
             self._init_openai_client()
+
+    def _init_gemini_client(self):
+        """Initialize the Google Gemini client."""
+        logger.info(f"Attempting to initialize Gemini client with model: {self.model}")
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.api_key)
+            self.llm_client = genai.GenerativeModel(self.model)
+            logger.info(f"✅ Initialized Gemini client with model {self.model}")
+        except ImportError as e:
+            logger.error(f"❌ google-generativeai package not installed: {e}")
+        except Exception as e:
+            logger.error(f"❌ Error initializing Gemini client: {e}", exc_info=True)
     
     def _init_huggingface_client(self):
         """Initialize the HuggingFace InferenceClient."""
@@ -585,7 +585,7 @@ Response:"""
         db: Session,
         course_id: int,
         week_number: int,
-        num_questions: int = 5,
+        num_questions: int = 1,  # Changed from 5 to 1 for reliability
         difficulty: str = "medium"
     ) -> Dict[str, Any]:
         """
@@ -640,7 +640,7 @@ Response:"""
             num_questions=num_questions
         )
         
-        questions_text = self._call_llm(prompt)
+        questions_text = self._call_llm(prompt, force_json=True)
         
         # Parse questions - try JSON first, fallback to regex
         questions = self._parse_mcq_json(questions_text)
@@ -772,12 +772,13 @@ Response:"""
         
         return suggestions
     
-    def _call_llm(self, prompt: str) -> str:
+    def _call_llm(self, prompt: str, force_json: bool = False) -> str:
         """
         Call the LLM with a prompt.
         
         Args:
             prompt: The prompt to send
+            force_json: If True, request JSON output format (for structured responses)
             
         Returns:
             LLM response text
@@ -786,7 +787,9 @@ Response:"""
             return self._get_mock_response(prompt)
         
         try:
-            if self.provider == "huggingface":
+            if self.provider == "gemini":
+                return self._call_gemini(prompt, force_json=force_json)
+            elif self.provider == "huggingface":
                 return self._call_huggingface(prompt)
             else:
                 return self._call_openai(prompt)
@@ -794,6 +797,26 @@ Response:"""
             logger.error(f"LLM call error: {e}")
             return self._get_mock_response(prompt)
     
+    def _call_gemini(self, prompt: str, force_json: bool = False) -> str:
+        """Call the Google Gemini API."""
+        # Convert explicit system prompt to just part of the prompt,
+        # as Gemini Flash sometimes handles system instructions differently via the generative model config
+        full_prompt = f"System: You are a helpful AI tutor for university students.\n\nUser: {prompt}"
+        
+        # Build generation config - only use JSON mode when explicitly requested
+        generation_config = dict(
+            max_output_tokens=2048,
+            temperature=0.7,
+        )
+        if force_json:
+            generation_config["response_mime_type"] = "application/json"
+        
+        response = self.llm_client.generate_content(
+            full_prompt,
+            generation_config=generation_config
+        )
+        return response.text
+
     def _call_huggingface(self, prompt: str) -> str:
         """Call the HuggingFace Inference API."""
         messages = [
@@ -846,10 +869,61 @@ Response:"""
             context = "No specific course materials found for this query in the database."
             logger.warning(f"RAG context retrieval empty for prompt: {prompt[:50]}...")
 
+
         # 2. Return context-aware responses based on prompt type
         prompt_lower = prompt.lower()
         
-        if "explain" in prompt_lower or "chat" in prompt_lower or "conversation" in prompt_lower:
+        if ("generate" in prompt_lower or "create" in prompt_lower) and "questions" in prompt_lower:
+            import json
+            # Extract topic
+            topic = "the topic"
+            topic_match = re.search(r"understanding of (.*?)\.", prompt)
+            if topic_match:
+                topic = topic_match.group(1).strip()
+            else:
+                topic_match = re.search(r"Topic[:\s]+([^\n]+)", prompt)
+                if topic_match:
+                    topic = topic_match.group(1).strip()
+
+            # Return proper MCQ JSON structure for offline mode
+            mock_questions = [
+                {
+                    "question": f"What is the primary definition of {topic}?",
+                    "options": {
+                        "A": f"A fundamental concept in {topic}",
+                        "B": "An unrelated technical term",
+                        "C": "A deprecated methodology",
+                        "D": "None of the above"
+                    },
+                    "correct_answer": "A",
+                    "explanation": f"This tests basic understanding of {topic}. (Offline mode - connect AI for real questions)"
+                },
+                {
+                    "question": f"Which of the following best describes the application of {topic}?",
+                    "options": {
+                        "A": "It has no practical applications",
+                        "B": f"It is used to solve problems related to {topic}",
+                        "C": "It is only theoretical",
+                        "D": "It was deprecated in recent versions"
+                    },
+                    "correct_answer": "B",
+                    "explanation": f"Understanding practical applications of {topic} is key. (Offline mode)"
+                },
+                {
+                    "question": f"What is a key characteristic of {topic}?",
+                    "options": {
+                        "A": "It requires no prior knowledge",
+                        "B": "It builds on foundational concepts",
+                        "C": "It is completely independent of other topics",
+                        "D": "It has been replaced by newer methods"
+                    },
+                    "correct_answer": "B",
+                    "explanation": f"Most topics in this course build on prior knowledge. (Offline mode)"
+                }
+            ]
+            return json.dumps(mock_questions)
+
+        elif "explain" in prompt_lower or "chat" in prompt_lower or "conversation" in prompt_lower:
             return f"""✨ **Smart Offline Mode** (AI Tutor)
 
 I found the following relevant information in your course materials that answers your question:
@@ -859,22 +933,6 @@ I found the following relevant information in your course materials that answers
 ---------------------------------------------------
 
 *(Note: The OpenAI API key is currently invalid/missing, so I cannot generate a custom explanation. However, the search results above are accurate from your uploaded documents.)*"""
-            
-        elif "generate" in prompt_lower and "questions" in prompt_lower:
-             # Extract topic
-            topic = "the topic"
-            topic_match = re.search(r"Topic: (.*)", prompt)
-            if topic_match:
-                topic = topic_match.group(1).strip()
-
-            return f"""Here are some practice questions based on **{topic}** (Offline Mode):
-
-1. Define the core concepts of {topic} based on the course notes.
-2. Explain the significance of {topic} in the context of this course.
-3. Compare and contrast the key elements found in the materials regarding {topic}.
-4. Discuss the practical applications of {topic}.
-
-*Study Tip: Use the search feature or 'Auto-Discover' to find more detailed slides on this topic!*"""
             
         elif "check" in prompt_lower or "evaluate" in prompt_lower:
              return f"""✨ **Smart Offline Feedback**
@@ -922,71 +980,111 @@ Here is the start of the material content:
         import json
         import re
         
-        try:
-            # Try to extract JSON from markdown code blocks
-            json_match = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', text)
+        questions = []
+        json_str = None
+        
+        # Step 1: Extract JSON string from the text
+        # Try to extract JSON from markdown code blocks
+        json_match = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', text)
+        if json_match:
+            json_str = json_match.group(1).strip()
+        else:
+            # Try to find raw JSON array
+            json_match = re.search(r'\[\s*\{[\s\S]*\}\s*\]', text)
             if json_match:
-                json_str = json_match.group(1).strip()
+                json_str = json_match.group(0)
             else:
-                # Try to find raw JSON array
-                json_match = re.search(r'\[\s*\{[\s\S]*\}\s*\]', text)
-                if json_match:
-                    json_str = json_match.group(0)
-                else:
-                    logger.warning("No JSON found in LLM response")
-                    return []
-            
-            # Parse JSON
+                # Fallback: find proper start of array
+                start_idx = text.find('[')
+                if start_idx != -1:
+                    json_str = text[start_idx:]
+        
+        if not json_str:
+            logger.warning("No JSON found in LLM response")
+            return []
+        
+        # Step 2: Try to parse the JSON
+        try:
             questions = json.loads(json_str)
-            
-            if not isinstance(questions, list):
-                logger.warning("Parsed JSON is not a list")
-                return []
-            
-            # Validate and normalize each question
-            validated_questions = []
-            for q in questions:
-                if not isinstance(q, dict):
-                    continue
-                    
-                # Check required fields
-                if "question" not in q or "options" not in q or "correct_answer" not in q:
-                    logger.warning(f"Question missing required fields: {q.keys()}")
-                    continue
-                
-                # Normalize options to ensure A, B, C, D format
-                options = q.get("options", {})
-                if isinstance(options, dict):
-                    # Already in dict format
-                    normalized_options = options
-                elif isinstance(options, list):
-                    # Convert list to dict
-                    normalized_options = {
-                        chr(65 + i): opt for i, opt in enumerate(options[:4])
-                    }
-                else:
-                    continue
-                
-                validated_q = {
-                    "question": q["question"],
-                    "options": normalized_options,
-                    "correct_answer": q["correct_answer"].upper() if isinstance(q["correct_answer"], str) else q["correct_answer"],
-                    "explanation": q.get("explanation", ""),
-                    "cognitive_level": q.get("cognitive_level", "understand"),
-                    "distractors_rationale": q.get("distractors_rationale", ""),
-                    "type": "mcq"
-                }
-                validated_questions.append(validated_q)
-            
-            logger.info(f"Successfully parsed {len(validated_questions)} MCQ questions from JSON")
-            return validated_questions
-            
         except json.JSONDecodeError as e:
-            logger.warning(f"JSON decode error: {e}")
+            logger.warning(f"JSON decode error: {e}, attempting repair...")
+            # Attempt to repair simple JSON errors (truncated response or bad commas)
+            try:
+                # Remove trailing commas in objects using regex
+                json_str_clean = re.sub(r',\s*}', '}', json_str)
+                json_str_clean = re.sub(r',\s*]', ']', json_str_clean)
+                # Fix malformed keys like "A):" -> "A":
+                json_str_clean = re.sub(r'"([ABCD])\):', r'"\1":', json_str_clean)
+                
+                try:
+                    questions = json.loads(json_str_clean)
+                except json.JSONDecodeError:
+                    # Repair truncation
+                    if json_str_clean.strip().endswith("}"):
+                        json_str_fixed = json_str_clean + "]"
+                        questions = json.loads(json_str_fixed)
+                    elif json_str_clean.strip().endswith(","):
+                        json_str_fixed = json_str_clean.rstrip(",") + "}]"
+                        questions = json.loads(json_str_fixed)
+                    else:
+                        last_brace = json_str_clean.rfind("}")
+                        if last_brace != -1:
+                            json_str_fixed = json_str_clean[:last_brace+1] + "]"
+                            questions = json.loads(json_str_fixed)
+                        else:
+                            return []
+                
+                if isinstance(questions, list) and len(questions) > 0:
+                    logger.info("Successfully repaired and parsed broken JSON")
+                else:
+                    return []
+                    
+            except Exception as repair_e:
+                logger.error(f"Failed to repair JSON: {repair_e}")
+                return []
+        
+        # Step 3: Validate parsed data
+        if not isinstance(questions, list):
+            logger.warning("Parsed JSON is not a list")
             return []
-        except Exception as e:
-            logger.error(f"Error parsing MCQ JSON: {e}")
-            return []
+
+        # Step 4: Validate and normalize each question, converting options to array for frontend
+        validated_questions = []
+        for q in questions:
+            if not isinstance(q, dict):
+                continue
+                
+            # Check required fields
+            if "question" not in q or "options" not in q or "correct_answer" not in q:
+                logger.warning(f"Question missing required fields: {q.keys()}")
+                continue
+            
+            # Normalize options to array format for frontend compatibility
+            options = q.get("options", {})
+            if isinstance(options, dict):
+                # Convert dict {"A": "text", "B": "text"} to array ["A. text", "B. text"]
+                normalized_options = [f"{k}. {v}" for k, v in sorted(options.items())]
+            elif isinstance(options, list):
+                # Already in list format
+                normalized_options = options[:4]
+            else:
+                continue
+            
+            validated_q = {
+                "question": q["question"],
+                "options": normalized_options,
+                "correct_answer": q["correct_answer"].upper() if isinstance(q["correct_answer"], str) else q["correct_answer"],
+                "explanation": q.get("explanation", ""),
+                "cognitive_level": q.get("cognitive_level", "understand"),
+                "distractors_rationale": q.get("distractors_rationale", ""),
+                "type": "mcq"
+            }
+            validated_questions.append(validated_q)
+        
+        logger.info(f"Successfully parsed {len(validated_questions)} MCQ questions from JSON")
+        return validated_questions
+            
+
     
     def _parse_generated_questions(self, text: str) -> List[Dict[str, Any]]:
         """Parse generated questions text into structured format."""

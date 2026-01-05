@@ -4,8 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 300; // 5 minutes
 
 export async function POST(req: NextRequest) {
-    const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
-    const url = `${API_BASE}/tutor/generate-questions${req.nextUrl.search}`;
+    // Use backend URL directly - NEXT_PUBLIC_API_BASE_URL is for frontend routing
+    const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+    const url = `${BACKEND_URL}/api/v1/tutor/generate-questions${req.nextUrl.search}`;
 
     try {
         const body = await req.json();

@@ -94,7 +94,13 @@ type PracticeQuestionsResponse = {
   topic: string;
   week_number: number;
   difficulty: string;
-  questions: { question: string; type?: string }[];
+  questions: { 
+    question: string; 
+    type?: string;
+    options?: string[] | Record<string, string>;
+    correct_answer?: string;
+    explanation?: string;
+  }[];
   sources: string[];
 };
 

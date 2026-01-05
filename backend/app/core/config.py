@@ -25,8 +25,13 @@ class Settings(BaseSettings):
     
     # HuggingFace (primary)
     HUGGINGFACE_API_TOKEN: Optional[str] = None
-    HUGGINGFACE_MODEL: str = "Qwen/Qwen2.5-72B-Instruct"
-    USE_HUGGINGFACE_TUTOR: bool = True
+    HUGGINGFACE_MODEL: str = "HuggingFaceH4/zephyr-7b-beta"
+    USE_HUGGINGFACE_TUTOR: bool = False
+
+    # Google Gemini (New)
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-flash-latest"
+    USE_GEMINI_TUTOR: bool = True
     
     # General AI settings
     AI_TUTOR_MODEL: str = "gpt-3.5-turbo"  # Fallback/legacy
