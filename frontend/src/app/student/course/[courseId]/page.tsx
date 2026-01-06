@@ -304,7 +304,7 @@ export default function StudentCourseDetailPage() {
     const token = localStorage.getItem("access_token");
     if (!token || !data) return;
 
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/analytics/log`, {
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/api/v1/analytics/log`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
