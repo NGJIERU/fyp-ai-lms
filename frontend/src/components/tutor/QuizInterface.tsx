@@ -56,6 +56,16 @@ export default function QuizInterface({
         }
     };
 
+    // Guard against undefined question
+    if (!question) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="text-4xl mb-4">⏳</div>
+                <p className="text-gray-600">Loading question...</p>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-6">
             {/* Header */}
