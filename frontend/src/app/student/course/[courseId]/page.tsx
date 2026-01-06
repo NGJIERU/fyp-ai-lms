@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import TutorExplanation from "@/components/tutor/TutorExplanation";
 import RecommendationCard from "@/components/recommendations/RecommendationCard";
 import BundleCard from "@/components/recommendations/BundleCard";
+import { SmartFeedSkeleton } from "@/components/ui/Skeleton";
 import { useParams, useRouter } from "next/navigation";
 
 import { apiFetch } from "@/lib/api";
@@ -134,6 +135,7 @@ export default function StudentCourseDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [personalizedRecs, setPersonalizedRecs] = useState<PersonalizedRecommendation[]>([]);
   const [bundles, setBundles] = useState<ContextBundle[]>([]);
+  const [recsLoading, setRecsLoading] = useState(true);
   const [ratings, setRatings] = useState<Record<number, RatingSummary>>({});
   const [ratingInFlight, setRatingInFlight] = useState<number | null>(null);
   const [likedRecs, setLikedRecs] = useState<Set<number>>(new Set());
@@ -179,6 +181,7 @@ export default function StudentCourseDetailPage() {
   }, [authLoading, authorized, courseId, router]);
 
   async function fetchPersonalizedAndBundles(token: string, courseId: number) {
+    setRecsLoading(true);
     try {
       const [personalizedResp, bundlesResp] = await Promise.all([
         apiFetch<{ recommendations: PersonalizedRecommendation[] }>(
@@ -194,6 +197,8 @@ export default function StudentCourseDetailPage() {
       setBundles(bundlesResp.bundles ?? []);
     } catch (err) {
       console.error("Failed to load personalized content", err);
+    } finally {
+      setRecsLoading(false);
     }
   }
 
@@ -506,6 +511,8 @@ export default function StudentCourseDetailPage() {
               ))}
             </div>
           </section>
+        ) : recsLoading ? (
+          <SmartFeedSkeleton />
         ) : (
           <div className="flex flex-col gap-6">
             <section className="rounded-2xl bg-white p-6 shadow-sm">
