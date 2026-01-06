@@ -3,7 +3,7 @@ API endpoints for Analytics and Tracking
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
 
@@ -36,7 +36,7 @@ def record_heartbeat(
     if current_user.role not in [models.UserRole.STUDENT, models.UserRole.SUPER_ADMIN]:
         return HeartbeatResponse(session_id=0, duration_seconds=0, status="ignored")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     five_mins_ago = now - timedelta(minutes=5)
 
     # Find active session (updated recently)
