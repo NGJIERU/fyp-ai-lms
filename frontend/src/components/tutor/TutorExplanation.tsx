@@ -101,7 +101,7 @@ function parseContent(content: string): Section[] {
   return sections;
 }
 
-function formatContent(text: string): React.ReactNode[] {
+function formatContent(text: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
   let key = 0;
   
@@ -117,13 +117,13 @@ function formatContent(text: string): React.ReactNode[] {
     if (i + 2 < segments.length && /^\w*$/.test(segments[i + 1] || '')) {
       // Regular text before code block
       if (segment.trim()) {
-        parts.push(<span key={key++}>{formatInlineContent(segment)}</span>);
+        parts.push(<span key={`text-${key++}`}>{formatInlineContent(segment, key)}</span>);
       }
       // Code block
       const lang = segments[i + 1] || 'python';
       const code = segments[i + 2] || '';
       parts.push(
-        <div key={key++} className="my-3 rounded-lg overflow-hidden">
+        <div key={`code-${key++}`} className="my-3 rounded-lg overflow-hidden">
           <div className="bg-gray-800 px-3 py-1.5 flex items-center justify-between">
             <span className="text-xs text-gray-400 font-mono">{lang || 'code'}</span>
             <button 
@@ -142,16 +142,16 @@ function formatContent(text: string): React.ReactNode[] {
     } else {
       // Regular text
       if (segment.trim()) {
-        parts.push(<span key={key++}>{formatInlineContent(segment)}</span>);
+        parts.push(<span key={`seg-${key++}`}>{formatInlineContent(segment, key)}</span>);
       }
       i++;
     }
   }
   
-  return parts.length > 0 ? parts : [<span key={0}>{text}</span>];
+  return parts.length > 0 ? <>{parts}</> : <span>{text}</span>;
 }
 
-function formatInlineContent(text: string): React.ReactNode[] {
+function formatInlineContent(text: string, baseKey: number): React.ReactNode {
   const parts: React.ReactNode[] = [];
   let key = 0;
   
@@ -160,7 +160,7 @@ function formatInlineContent(text: string): React.ReactNode[] {
   
   lines.forEach((line, lineIdx) => {
     if (!line.trim()) {
-      parts.push(<br key={key++} />);
+      parts.push(<br key={`br-${baseKey}-${key++}`} />);
       return;
     }
     
@@ -169,15 +169,20 @@ function formatInlineContent(text: string): React.ReactNode[] {
     let lastIndex = 0;
     let match;
     const lineParts: React.ReactNode[] = [];
+    let partKey = 0;
     
     while ((match = inlineCodeRegex.exec(line)) !== null) {
       // Text before code
       if (match.index > lastIndex) {
-        lineParts.push(formatBoldText(line.slice(lastIndex, match.index), key++));
+        lineParts.push(
+          <span key={`pre-${baseKey}-${lineIdx}-${partKey++}`}>
+            {formatBoldText(line.slice(lastIndex, match.index))}
+          </span>
+        );
       }
       // Inline code
       lineParts.push(
-        <code key={key++} className="px-1.5 py-0.5 rounded bg-gray-100 text-indigo-700 font-mono text-xs">
+        <code key={`ic-${baseKey}-${lineIdx}-${partKey++}`} className="px-1.5 py-0.5 rounded bg-gray-100 text-indigo-700 font-mono text-xs">
           {match[1]}
         </code>
       );
@@ -186,19 +191,23 @@ function formatInlineContent(text: string): React.ReactNode[] {
     
     // Remaining text
     if (lastIndex < line.length) {
-      lineParts.push(formatBoldText(line.slice(lastIndex), key++));
+      lineParts.push(
+        <span key={`post-${baseKey}-${lineIdx}-${partKey++}`}>
+          {formatBoldText(line.slice(lastIndex))}
+        </span>
+      );
     }
     
-    parts.push(<span key={key++}>{lineParts}</span>);
+    parts.push(<span key={`line-${baseKey}-${key++}`}>{lineParts.length > 0 ? lineParts : line}</span>);
     if (lineIdx < lines.length - 1) {
-      parts.push(<br key={key++} />);
+      parts.push(<br key={`lbr-${baseKey}-${key++}`} />);
     }
   });
   
-  return parts;
+  return <>{parts}</>;
 }
 
-function formatBoldText(text: string, baseKey: number): React.ReactNode {
+function formatBoldText(text: string): React.ReactNode {
   const boldRegex = /\*\*([^*]+)\*\*/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -207,19 +216,19 @@ function formatBoldText(text: string, baseKey: number): React.ReactNode {
   
   while ((match = boldRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(<span key={`bold-${baseKey}-${key++}`}>{text.slice(lastIndex, match.index)}</span>);
+      parts.push(text.slice(lastIndex, match.index));
     }
     parts.push(
-      <span key={`bold-${baseKey}-${key++}`} className="font-semibold text-gray-900">{match[1]}</span>
+      <strong key={`b-${key++}`} className="font-semibold text-gray-900">{match[1]}</strong>
     );
     lastIndex = match.index + match[0].length;
   }
   
   if (lastIndex < text.length) {
-    parts.push(<span key={`bold-${baseKey}-${key++}`}>{text.slice(lastIndex)}</span>);
+    parts.push(text.slice(lastIndex));
   }
   
-  return parts.length > 0 ? <span key={`bold-wrap-${baseKey}`}>{parts}</span> : <span key={`bold-text-${baseKey}`}>{text}</span>;
+  return parts.length > 0 ? <>{parts}</> : text;
 }
 
 function SubsectionIcon({ type }: { type: string }) {
@@ -277,7 +286,7 @@ function AccordionSection({ section, index, defaultOpen = false }: { section: Se
         <div className="px-4 pb-4 space-y-4">
           {/* Main content */}
           {section.content && (
-            <div className="text-gray-600 text-sm leading-relaxed pl-11">
+            <div className="text-gray-600 text-sm leading-relaxed pl-11 whitespace-pre-wrap">
               {formatContent(section.content)}
             </div>
           )}
@@ -287,7 +296,7 @@ function AccordionSection({ section, index, defaultOpen = false }: { section: Se
             <div key={subIndex} className="ml-11 space-y-2">
               <div className="border-l-2 border-gray-200 pl-4 py-2">
                 <SubsectionBadge type={sub.type} label={sub.label} />
-                <div className="mt-2 text-sm text-gray-600 leading-relaxed">
+                <div className="mt-2 text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
                   {formatContent(sub.content)}
                 </div>
               </div>
