@@ -62,6 +62,21 @@ type LecturerDashboardResponse = {
   rating_insights: RatingInsightItem[];
 };
 
+// Helper function for relative time display
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
 export default function LecturerDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<LecturerDashboardResponse | null>(null);
@@ -261,21 +276,33 @@ export default function LecturerDashboardPage() {
                     No recent submissions.
                   </p>
                 )}
-                {data.recent_submissions.map((submission, index) => (
-                  <div key={`${submission.student_id}-${index}`} className="rounded-lg border border-gray-100 p-4">
-                    <p className="text-sm font-medium text-gray-900">
-                      Student #{submission.student_id} · Week {submission.week_number}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Course #{submission.course_id} · Score {submission.score?.toFixed(1) ?? "-"}%
-                    </p>
-                    <p className="mt-1 text-xs text-gray-400">
-                      {submission.attempted_at
-                        ? new Date(submission.attempted_at).toLocaleString()
-                        : "Timestamp unavailable"}
-                    </p>
-                  </div>
-                ))}
+                {data.recent_submissions.map((submission, index) => {
+                  const score = submission.score ?? 0;
+                  const scoreColor = score >= 70 ? "text-emerald-600 bg-emerald-50" : score >= 40 ? "text-amber-600 bg-amber-50" : "text-red-600 bg-red-50";
+                  const scoreIcon = score >= 70 ? "✅" : score >= 40 ? "📊" : "📝";
+                  const timeAgo = submission.attempted_at ? getRelativeTime(new Date(submission.attempted_at)) : "Unknown";
+                  
+                  return (
+                    <div key={`${submission.student_id}-${index}`} className="flex items-center gap-4 rounded-xl border border-gray-100 p-4 hover:border-gray-200 hover:bg-gray-50 transition">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full ${scoreColor}`}>
+                        <span className="text-lg">{scoreIcon}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            Student #{submission.student_id}
+                          </p>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${scoreColor}`}>
+                            {score.toFixed(0)}%
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Week {submission.week_number} · {timeAgo}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
