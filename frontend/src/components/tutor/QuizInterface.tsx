@@ -83,11 +83,11 @@ export default function QuizInterface({
                                 onClick={() => !feedback && setSelectedOption(opt)}
                                 disabled={!!feedback || isSubmitting}
                                 className={`flex items-center justify-between rounded-xl border p-4 text-left transition ${selectedOption === opt
-                                        ? "border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600"
-                                        : "border-gray-200 hover:border-indigo-200 hover:bg-gray-50"
+                                        ? "border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600 text-indigo-900"
+                                        : "border-gray-200 hover:border-indigo-200 hover:bg-gray-50 text-gray-800"
                                     } ${feedback ? "cursor-default opacity-80" : ""}`}
                             >
-                                <span>{opt}</span>
+                                <span className="font-medium">{opt}</span>
                             </button>
                         ))}
                     </div>
