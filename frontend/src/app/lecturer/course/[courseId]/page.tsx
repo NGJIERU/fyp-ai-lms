@@ -22,8 +22,24 @@ type Submission = {
   course_id: number;
   week_number: number;
   score: number;
+  questions_answered?: number;
   attempted_at?: string | null;
 };
+
+// Helper function for relative time display
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
 
 type LecturerDashboardResponse = {
   courses: LecturerCourseStats[];
@@ -379,22 +395,39 @@ export default function LecturerCourseDetailPage() {
               {submissions.length === 0 && (
                 <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No recent submissions for this course.</p>
               )}
-              {submissions.map((submission, index) => (
-                <button
-                  key={`${submission.student_id}-${index}`}
-                  onClick={() => setSelectedSubmission(submission)}
-                  className="w-full text-left rounded-lg border border-gray-100 p-4 hover:bg-gray-50 hover:border-indigo-200 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900 group-hover:text-indigo-700">Student #{submission.student_id}</p>
-                    <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">View details →</span>
-                  </div>
-                  <p className="text-xs text-gray-500">Week {submission.week_number} · Score {submission.score?.toFixed(1) ?? "-"}%</p>
-                  <p className="mt-1 text-xs text-gray-400">
-                    {submission.attempted_at ? new Date(submission.attempted_at).toLocaleString() : "Timestamp unavailable"}
-                  </p>
-                </button>
-              ))}
+              {submissions.map((submission, index) => {
+                const score = submission.score ?? 0;
+                const questionsAnswered = submission.questions_answered ?? 1;
+                const scoreColor = score >= 70 ? "text-emerald-600 bg-emerald-50" : score >= 40 ? "text-amber-600 bg-amber-50" : "text-red-600 bg-red-50";
+                const scoreIcon = score >= 70 ? "✅" : score >= 40 ? "📊" : "📝";
+                const timeAgo = submission.attempted_at ? getRelativeTime(new Date(submission.attempted_at)) : "Unknown";
+                
+                return (
+                  <button
+                    key={`${submission.student_id}-${index}`}
+                    onClick={() => setSelectedSubmission(submission)}
+                    className="w-full text-left flex items-center gap-4 rounded-xl border border-gray-100 p-4 hover:bg-gray-50 hover:border-indigo-200 transition-all cursor-pointer group"
+                  >
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full ${scoreColor}`}>
+                      <span className="text-lg">{scoreIcon}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-900 group-hover:text-indigo-700 truncate">
+                          Student #{submission.student_id}
+                        </p>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${scoreColor}`}>
+                          {score.toFixed(0)}%
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Week {submission.week_number} · {questionsAnswered} Q · {timeAgo}
+                      </p>
+                    </div>
+                    <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </section>
