@@ -14,6 +14,7 @@ from app.api import deps
 from app.core.database import get_db
 from app.core import security
 from app.services.crawler.crawler_health import get_crawler_health_service
+from app.services.processing.deduplication import get_deduplication_service
 
 router = APIRouter()
 
@@ -515,7 +516,7 @@ def assign_lecturer_to_course(
 @router.get("/crawler/health")
 def get_crawler_health(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(deps.get_current_super_admin),
+    current_user: models.User = Depends(deps.get_current_active_superuser),
 ):
     """
     Get crawler health summary.
@@ -532,7 +533,7 @@ def get_crawler_logs(
     status: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(deps.get_current_super_admin),
+    current_user: models.User = Depends(deps.get_current_active_superuser),
 ):
     """
     Get recent crawler logs with optional filters.
@@ -553,7 +554,7 @@ def get_crawler_stats(
     crawler_type: str,
     days: int = Query(7, ge=1, le=30),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(deps.get_current_super_admin),
+    current_user: models.User = Depends(deps.get_current_active_superuser),
 ):
     """
     Get detailed stats for a specific crawler.
@@ -561,3 +562,99 @@ def get_crawler_stats(
     """
     health_service = get_crawler_health_service(db)
     return health_service.get_crawler_stats(crawler_type, days)
+
+
+# ==================== Deduplication Endpoints ====================
+
+@router.get("/deduplication/stats")
+def get_deduplication_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_active_superuser),
+):
+    """
+    Get deduplication statistics.
+    Shows total materials, duplicate groups, and potential savings.
+    Super admin only.
+    """
+    dedup_service = get_deduplication_service(db)
+    return dedup_service.get_stats()
+
+
+@router.get("/deduplication/scan")
+def scan_duplicates(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_active_superuser),
+):
+    """
+    Scan for duplicate materials.
+    Returns groups of duplicates with recommended actions.
+    Super admin only.
+    """
+    dedup_service = get_deduplication_service(db)
+    groups = dedup_service.scan_all_duplicates(limit=limit)
+    return {
+        "duplicate_groups": groups,
+        "total_groups": len(groups)
+    }
+
+
+@router.get("/deduplication/check/{material_id}")
+def check_material_duplicates(
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_active_superuser),
+):
+    """
+    Check a specific material for duplicates.
+    Super admin only.
+    """
+    from app.models.material import Material
+    
+    material = db.query(Material).filter(Material.id == material_id).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    
+    dedup_service = get_deduplication_service(db)
+    duplicates = dedup_service.find_duplicates(material)
+    
+    return {
+        "material_id": material_id,
+        "title": material.title,
+        "duplicates": duplicates,
+        "duplicate_count": len(duplicates)
+    }
+
+
+class MergeRequest(BaseModel):
+    keep_id: int = Field(..., description="ID of material to keep")
+    remove_ids: List[int] = Field(..., description="IDs of materials to remove")
+    transfer_topics: bool = Field(True, description="Transfer topic mappings to kept material")
+
+
+@router.post("/deduplication/merge")
+def merge_duplicates(
+    request: MergeRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_active_superuser),
+):
+    """
+    Merge duplicate materials.
+    Keeps one material and removes others, optionally transferring topic mappings.
+    Super admin only.
+    """
+    dedup_service = get_deduplication_service(db)
+    
+    try:
+        result = dedup_service.merge_duplicates(
+            keep_id=request.keep_id,
+            remove_ids=request.remove_ids,
+            transfer_topics=request.transfer_topics
+        )
+        return {
+            "status": "success",
+            "message": f"Merged {result['removed_count']} duplicates",
+            **result
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
