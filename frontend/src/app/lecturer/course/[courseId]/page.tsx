@@ -55,6 +55,7 @@ type WeekAnalytics = {
   topic: string;
   avg_score: number;
   attempts_count: number;
+  students_count: number;
   common_mistakes: string[];
 };
 
@@ -322,23 +323,53 @@ export default function LecturerCourseDetailPage() {
               {weekAnalytics.length === 0 && (
                 <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No analytics yet. Encourage students to submit quizzes.</p>
               )}
-              {weekAnalytics.map((week) => (
-                <div key={week.week_number} className="rounded-xl border border-gray-100 p-4">
-                  <div className="flex items-center justify-between text-sm text-gray-600">
-                    <span>
-                      Week {week.week_number}: <span className="font-medium text-gray-900">{week.topic}</span>
-                    </span>
-                    <span className="font-semibold text-gray-900">{week.avg_score.toFixed(1)}%</span>
+              {weekAnalytics.map((week) => {
+                // Color-code based on score
+                const scoreColor = week.avg_score >= 70 
+                  ? "text-emerald-600" 
+                  : week.avg_score >= 50 
+                    ? "text-amber-600" 
+                    : "text-red-500";
+                const barColor = week.avg_score >= 70
+                  ? "from-emerald-400 to-emerald-500"
+                  : week.avg_score >= 50
+                    ? "from-amber-400 to-amber-500"
+                    : "from-red-400 to-red-500";
+                // Ensure minimum bar width for visibility
+                const barWidth = Math.max(week.avg_score, week.students_count > 0 ? 3 : 0);
+                
+                return (
+                  <div key={week.week_number} className="rounded-xl border border-gray-100 p-4">
+                    <div className="flex items-center justify-between text-sm text-gray-600">
+                      <span>
+                        Week {week.week_number}: <span className="font-medium text-gray-900">{week.topic}</span>
+                      </span>
+                      <span className={`font-semibold ${scoreColor}`}>{week.avg_score.toFixed(1)}%</span>
+                    </div>
+                    <div className="mt-3 h-3 rounded-full bg-gray-100">
+                      <div
+                        className={`h-3 rounded-full bg-linear-to-r ${barColor}`}
+                        style={{ width: `${Math.min(barWidth, 100)}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                      <span>
+                        {week.students_count > 0 ? (
+                          <>{week.students_count} student{week.students_count !== 1 ? "s" : ""} · {week.attempts_count} attempt{week.attempts_count !== 1 ? "s" : ""}</>
+                        ) : (
+                          <span className="text-gray-400">No attempts yet</span>
+                        )}
+                      </span>
+                      {week.students_count > 0 && week.avg_score < 50 && (
+                        <span className="text-red-500 font-medium">Needs attention</span>
+                      )}
+                      {week.avg_score >= 70 && week.students_count > 0 && (
+                        <span className="text-emerald-600 font-medium">On track</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-3 h-3 rounded-full bg-gray-100">
-                    <div
-                      className="h-3 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600"
-                      style={{ width: `${Math.min(Math.max(week.avg_score, 0), 100)}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-gray-500">{week.attempts_count} attempts logged</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

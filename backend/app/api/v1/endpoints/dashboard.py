@@ -132,6 +132,7 @@ class WeekAnalytics(BaseModel):
     topic: str
     avg_score: float
     attempts_count: int
+    students_count: int
     common_mistakes: List[str]
 
 
@@ -945,7 +946,8 @@ def get_course_week_analytics(
         stats = (
             db.query(
                 func.avg(models.TopicPerformance.average_score).label('avg_score'),
-                func.sum(models.TopicPerformance.total_attempts).label('total_attempts')
+                func.sum(models.TopicPerformance.total_attempts).label('total_attempts'),
+                func.count(models.TopicPerformance.student_id).label('students_count')
             )
             .filter(
                 models.TopicPerformance.course_id == course_id,
@@ -958,6 +960,7 @@ def get_course_week_analytics(
         # (see ai_tutor.py line 396: current_score_pct = ... * 100)
         avg_score = stats.avg_score or 0
         attempts = stats.total_attempts or 0
+        students = stats.students_count or 0
         
         # Common mistakes would come from analyzing quiz attempts
         # For now, return placeholder
@@ -968,6 +971,7 @@ def get_course_week_analytics(
             topic=entry.topic,
             avg_score=round(avg_score, 1),
             attempts_count=attempts,
+            students_count=students,
             common_mistakes=common_mistakes
         ))
     
