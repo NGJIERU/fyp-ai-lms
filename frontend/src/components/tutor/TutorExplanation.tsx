@@ -101,56 +101,125 @@ function parseContent(content: string): Section[] {
   return sections;
 }
 
-function highlightKeyTerms(text: string): React.ReactNode[] {
-  // Match **term**: description pattern and bold terms
+function formatContent(text: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
-  const regex = /\*\*([^*]+)\*\*:?\s*/g;
-  let lastIndex = 0;
-  let match;
   let key = 0;
   
-  const cleanText = text.replace(/\*\*/g, "");
-  const termRegex = /([A-Z][a-zA-Z\s]+(?:\([^)]+\))?)\s*:/g;
+  // Split by code blocks first
+  const codeBlockRegex = /```(\w*)?\n?([\s\S]*?)```/g;
+  const segments = text.split(codeBlockRegex);
   
-  let termMatch;
-  let processedText = text;
-  const terms: string[] = [];
-  
-  // Find all bold terms
-  while ((match = regex.exec(text)) !== null) {
-    terms.push(match[1]);
+  let i = 0;
+  while (i < segments.length) {
+    const segment = segments[i];
+    
+    // Check if this is a code block (language, then content)
+    if (i + 2 < segments.length && /^\w*$/.test(segments[i + 1] || '')) {
+      // Regular text before code block
+      if (segment.trim()) {
+        parts.push(<span key={key++}>{formatInlineContent(segment)}</span>);
+      }
+      // Code block
+      const lang = segments[i + 1] || 'python';
+      const code = segments[i + 2] || '';
+      parts.push(
+        <div key={key++} className="my-3 rounded-lg overflow-hidden">
+          <div className="bg-gray-800 px-3 py-1.5 flex items-center justify-between">
+            <span className="text-xs text-gray-400 font-mono">{lang || 'code'}</span>
+            <button 
+              onClick={() => navigator.clipboard.writeText(code.trim())}
+              className="text-xs text-gray-400 hover:text-white transition"
+            >
+              Copy
+            </button>
+          </div>
+          <pre className="bg-gray-900 p-3 overflow-x-auto">
+            <code className="text-sm text-green-400 font-mono whitespace-pre">{code.trim()}</code>
+          </pre>
+        </div>
+      );
+      i += 3;
+    } else {
+      // Regular text
+      if (segment.trim()) {
+        parts.push(<span key={key++}>{formatInlineContent(segment)}</span>);
+      }
+      i++;
+    }
   }
   
-  // If we found terms, highlight them
-  if (terms.length > 0) {
-    let result = text;
-    terms.forEach((term, idx) => {
-      const boldPattern = `**${term}**`;
-      result = result.replace(boldPattern, `|||TERM_${idx}|||`);
-    });
+  return parts.length > 0 ? parts : [<span key={0}>{text}</span>];
+}
+
+function formatInlineContent(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let key = 0;
+  
+  // Split into lines for better formatting
+  const lines = text.split('\n');
+  
+  lines.forEach((line, lineIdx) => {
+    if (!line.trim()) {
+      parts.push(<br key={key++} />);
+      return;
+    }
     
-    const segments = result.split(/\|\|\|TERM_\d+\|\|\|/);
+    // Handle inline code `code`
+    const inlineCodeRegex = /`([^`]+)`/g;
+    let lastIndex = 0;
+    let match;
+    const lineParts: React.ReactNode[] = [];
     
-    segments.forEach((segment, idx) => {
-      if (segment) {
-        parts.push(<span key={key++}>{segment.replace(/\*\*/g, "")}</span>);
+    while ((match = inlineCodeRegex.exec(line)) !== null) {
+      // Text before code
+      if (match.index > lastIndex) {
+        lineParts.push(formatBoldText(line.slice(lastIndex, match.index), key++));
       }
-      if (idx < terms.length) {
-        parts.push(
-          <span
-            key={key++}
-            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-100 text-indigo-800 mx-1"
-          >
-            {terms[idx]}
-          </span>
-        );
-      }
-    });
+      // Inline code
+      lineParts.push(
+        <code key={key++} className="px-1.5 py-0.5 rounded bg-gray-100 text-indigo-700 font-mono text-xs">
+          {match[1]}
+        </code>
+      );
+      lastIndex = match.index + match[0].length;
+    }
     
-    return parts;
+    // Remaining text
+    if (lastIndex < line.length) {
+      lineParts.push(formatBoldText(line.slice(lastIndex), key++));
+    }
+    
+    parts.push(<span key={key++}>{lineParts}</span>);
+    if (lineIdx < lines.length - 1) {
+      parts.push(<br key={key++} />);
+    }
+  });
+  
+  return parts;
+}
+
+function formatBoldText(text: string, baseKey: number): React.ReactNode {
+  const boldRegex = /\*\*([^*]+)\*\*/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+  let key = baseKey;
+  
+  while ((match = boldRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(<span key={key++}>{text.slice(lastIndex, match.index)}</span>);
+    }
+    parts.push(
+      <span key={key++} className="font-semibold text-gray-900">{match[1]}</span>
+    );
+    lastIndex = match.index + match[0].length;
   }
   
-  return [<span key={0}>{text.replace(/\*\*/g, "")}</span>];
+  if (lastIndex < text.length) {
+    parts.push(<span key={key++}>{text.slice(lastIndex)}</span>);
+  }
+  
+  return parts.length > 0 ? <>{parts}</> : <span>{text}</span>;
 }
 
 function SubsectionIcon({ type }: { type: string }) {
@@ -208,9 +277,9 @@ function AccordionSection({ section, index, defaultOpen = false }: { section: Se
         <div className="px-4 pb-4 space-y-4">
           {/* Main content */}
           {section.content && (
-            <p className="text-gray-600 text-sm leading-relaxed pl-11">
-              {section.content}
-            </p>
+            <div className="text-gray-600 text-sm leading-relaxed pl-11">
+              {formatContent(section.content)}
+            </div>
           )}
           
           {/* Subsections */}
@@ -219,7 +288,7 @@ function AccordionSection({ section, index, defaultOpen = false }: { section: Se
               <div className="border-l-2 border-gray-200 pl-4 py-2">
                 <SubsectionBadge type={sub.type} label={sub.label} />
                 <div className="mt-2 text-sm text-gray-600 leading-relaxed">
-                  {highlightKeyTerms(sub.content)}
+                  {formatContent(sub.content)}
                 </div>
               </div>
             </div>
