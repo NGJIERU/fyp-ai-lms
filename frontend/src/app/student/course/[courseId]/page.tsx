@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import TutorExplanation from "@/components/tutor/TutorExplanation";
 import { useParams, useRouter } from "next/navigation";
 
 import { apiFetch } from "@/lib/api";
@@ -817,9 +818,7 @@ function WeekCard({
                     {isAskingTutor ? "Thinking..." : "Regenerate Answer ↻"}
                   </button>
                 </div>
-                <div className="prose prose-sm max-w-none text-gray-700">
-                  <ReactMarkdown>{tutorResponse.explanation}</ReactMarkdown>
-                </div>
+                <TutorExplanation content={tutorResponse.explanation} />
                 {tutorResponse.sources?.length ? (
                   <div className="mt-4 rounded-lg bg-gray-50 p-3 text-xs">
                     <p className="mb-2 font-semibold text-gray-500 uppercase tracking-wider text-[10px]">Sources</p>
