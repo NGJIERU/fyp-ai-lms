@@ -39,6 +39,7 @@ class ExplainRequest(BaseModel):
     topic: str = Field(..., description="Topic to explain")
     question: Optional[str] = Field(None, description="Specific question about the topic")
     week_number: Optional[int] = Field(None, ge=1, le=14)
+    context: Optional[str] = Field(None, description="Additional context like related quiz questions")
 
 
 class ExplainResponse(BaseModel):
@@ -172,7 +173,8 @@ def explain_concept(
         course_id=course_id,
         topic=request.topic,
         question=request.question,
-        week_number=request.week_number
+        week_number=request.week_number,
+        context=request.context
     )
     
     return ExplainResponse(**result)

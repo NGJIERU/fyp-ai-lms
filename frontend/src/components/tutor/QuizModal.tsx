@@ -61,15 +61,28 @@ export default function QuizModal({
                 }),
             });
 
-            // 2. Parse questions
-            // The backend returns a list of question objects or raw text parsed by specific logic.
-            // Let's adapt whatever comes back.
-            const parsedQuestions: Question[] = data.questions.map((q: any) => ({
-                question: q.question,
-                type: q.type || "short_text",
-                options: q.options, // Might be undefined if backend mock generator is basic
-                correct_answer: q.correct_answer,
-            }));
+            // 2. Parse questions - normalize options from dict to array
+            const parsedQuestions: Question[] = data.questions.map((q: any) => {
+                let normalizedOptions: string[] | undefined = undefined;
+                
+                if (q.options) {
+                    if (Array.isArray(q.options)) {
+                        normalizedOptions = q.options;
+                    } else if (typeof q.options === 'object') {
+                        // Convert dict {"A": "text", "B": "text"} to array ["A. text", "B. text"]
+                        normalizedOptions = Object.entries(q.options)
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([key, value]) => `${key}. ${value}`);
+                    }
+                }
+                
+                return {
+                    question: q.question,
+                    type: normalizedOptions ? "mcq" : (q.type || "short_text"),
+                    options: normalizedOptions,
+                    correct_answer: q.correct_answer,
+                };
+            });
 
             setQuestions(parsedQuestions);
             setHasStarted(true);

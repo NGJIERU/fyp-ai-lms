@@ -17,11 +17,24 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 days
 
-    # AI / OpenAI settings
+    # AI / LLM settings
+    # OpenAI (legacy - can be removed)
     OPENAI_API_KEY: Optional[str] = None
-    AI_TUTOR_MODEL: str = "gpt-3.5-turbo"
     USE_OPENAI_TUTOR: bool = False
     USE_OPENAI_EMBEDDINGS: bool = False
+    
+    # HuggingFace (primary - recommended)
+    HUGGINGFACE_API_TOKEN: Optional[str] = None
+    HUGGINGFACE_MODEL: str = "Qwen/Qwen2.5-72B-Instruct"
+    USE_HUGGINGFACE_TUTOR: bool = True
+
+    # Google Gemini (disabled by default - quota issues on free tier)
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    USE_GEMINI_TUTOR: bool = False
+    
+    # General AI settings
+    AI_TUTOR_MODEL: str = "gpt-3.5-turbo"  # Fallback/legacy
     EMBEDDING_MODEL_NAME: str = "local_fast"
     BACKEND_CORS_ORIGINS: List[str] = []
 

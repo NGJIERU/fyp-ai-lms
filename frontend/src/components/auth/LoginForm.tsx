@@ -31,7 +31,7 @@ export default function LoginForm() {
 
     try {
       // Use apiFetch instead of direct fetch to avoid double URL issues
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/auth/login`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || ""}/api/v1/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",

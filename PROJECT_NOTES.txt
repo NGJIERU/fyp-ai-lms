@@ -1,0 +1,353 @@
+================================================================================
+                    AI-POWERED LMS - PROJECT NOTES & DEVELOPER GUIDE
+================================================================================
+                            Last Updated: January 6, 2026
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. Project Overview
+2. Running the Project
+3. Environment Configuration
+4. Architecture Overview
+5. Key Features & How They Work
+6. Common Issues & Solutions
+7. Development Guidelines
+8. API Endpoints Reference
+9. Database Notes
+10. Future Enhancement Considerations
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+This is an AI-powered Learning Management System (LMS) with the following stack:
+- Backend: FastAPI (Python) with SQLAlchemy ORM
+- Frontend: Next.js 16 (React/TypeScript)
+- Database: SQLite (development) / PostgreSQL (production)
+- AI Provider: HuggingFace Inference API (Qwen/Qwen2.5-72B-Instruct model)
+
+================================================================================
+2. RUNNING THE PROJECT
+================================================================================
+
+STEP 1: Start the Backend Server
+--------------------------------
+cd /Users/jieru_0901/fyp_antigravity_5Dec_py/backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+STEP 2: Start the Frontend Server
+---------------------------------
+cd /Users/jieru_0901/fyp_antigravity_5Dec_py/frontend
+npm run dev
+
+STEP 3: Access the Application
+------------------------------
+- Frontend: http://127.0.0.1:3000 or http://localhost:3000
+- Backend API Docs: http://127.0.0.1:8000/docs
+
+IMPORTANT: Always start the backend FIRST, then the frontend.
+
+================================================================================
+3. ENVIRONMENT CONFIGURATION
+================================================================================
+
+BACKEND (.env file in /backend/)
+--------------------------------
+Required variables:
+
+# Database (SQLite for development)
+SQLALCHEMY_DATABASE_URI=sqlite:///./demo.db
+
+# Security
+SECRET_KEY=your-secret-key-change-in-production
+
+# HuggingFace AI (REQUIRED for AI features to work)
+HUGGINGFACE_API_TOKEN=hf_your_token_here
+HUGGINGFACE_MODEL=Qwen/Qwen2.5-72B-Instruct
+USE_HUGGINGFACE_TUTOR=true
+
+# OpenAI (optional fallback - disabled by default)
+USE_OPENAI_TUTOR=false
+USE_OPENAI_EMBEDDINGS=false
+
+# CORS
+BACKEND_CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
+
+
+FRONTEND (.env.local file in /frontend/)
+----------------------------------------
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+
+*** CRITICAL NOTES ***
+- The frontend env must be http://127.0.0.1:8000 (WITHOUT /api/v1 suffix)
+- The frontend code adds /api/v1 to paths automatically
+- If you set NEXT_PUBLIC_API_BASE_URL=/api/v1, paths will be doubled!
+
+
+================================================================================
+4. ARCHITECTURE OVERVIEW
+================================================================================
+
+FRONTEND STRUCTURE
+------------------
+frontend/src/
+├── app/                    # Next.js App Router pages
+│   ├── (auth)/            # Auth pages (login, register)
+│   ├── student/           # Student dashboard & course pages
+│   ├── lecturer/          # Lecturer dashboard & course management
+│   └── admin/             # Admin user management
+├── components/            # Reusable React components
+│   ├── auth/              # LoginForm, RegisterForm
+│   ├── tutor/             # QuizModal, QuizInterface
+│   └── materials/         # Material upload & display
+├── hooks/                 # Custom React hooks
+└── lib/                   # Utilities (api.ts)
+
+BACKEND STRUCTURE
+-----------------
+backend/app/
+├── api/v1/endpoints/      # API route handlers
+│   ├── auth.py            # Login/register endpoints
+│   ├── tutor.py           # AI tutor endpoints (quiz, explain, chat)
+│   ├── dashboard.py       # Student/lecturer dashboards
+│   └── materials.py       # Material management
+├── core/                  # Configuration & security
+│   ├── config.py          # Settings from .env
+│   └── security.py        # JWT handling
+├── models/                # SQLAlchemy ORM models
+├── services/              # Business logic
+│   └── tutor/             # AI Tutor service
+│       ├── ai_tutor.py    # Main tutor logic
+│       ├── rag_pipeline.py # Context retrieval
+│       └── answer_checker.py # Answer grading
+└── main.py                # FastAPI app entry point
+
+
+================================================================================
+5. KEY FEATURES & HOW THEY WORK
+================================================================================
+
+PRACTICE QUIZ (Generate Questions)
+----------------------------------
+Flow:
+1. Frontend: User clicks "Generate Questions" button
+2. API Call: POST /api/v1/tutor/generate-questions?course_id={id}
+3. Backend: 
+   - Retrieves syllabus topic for the week
+   - Uses RAG pipeline to find relevant course materials
+   - Sends prompt to HuggingFace LLM
+   - Parses JSON response into MCQ format
+4. Frontend: Displays questions with options
+
+Key Files:
+- Frontend: frontend/src/app/student/course/[courseId]/page.tsx (handleGenerateQuestions)
+- Frontend: frontend/src/components/tutor/QuizModal.tsx
+- Backend: backend/app/api/v1/endpoints/tutor.py (generate_practice_questions)
+- Backend: backend/app/services/tutor/ai_tutor.py (generate_practice_questions method)
+
+
+TUTOR INSIGHT (Explain Topic)
+-----------------------------
+Flow:
+1. Frontend: User clicks "Explain This Topic" button
+2. API Call: POST /api/v1/tutor/explain?course_id={id}
+3. Backend:
+   - Uses RAG pipeline to retrieve relevant materials
+   - Generates explanation using LLM
+   - Returns explanation with source citations
+4. Frontend: Displays markdown-formatted explanation
+
+Key Files:
+- Frontend: frontend/src/app/student/course/[courseId]/page.tsx (handleAskTutor)
+- Backend: backend/app/api/v1/endpoints/tutor.py (explain_concept)
+- Backend: backend/app/services/tutor/ai_tutor.py (explain_concept method)
+
+
+AI CHAT (Full Conversation)
+---------------------------
+Flow:
+1. User navigates to /student/course/{id}/chat
+2. Messages sent to POST /api/v1/tutor/chat?course_id={id}
+3. Backend maintains conversation history and RAG context
+4. Returns AI response with sources
+
+Key Files:
+- Backend: backend/app/services/tutor/ai_tutor.py (chat method)
+
+
+================================================================================
+6. COMMON ISSUES & SOLUTIONS
+================================================================================
+
+ISSUE: "signal is aborted without reason" error
+-----------------------------------------------
+Cause: Frontend request was cancelled (navigation, component unmount, timeout)
+Solution: This is usually harmless - the request was aborted before completion.
+          If persistent, check network connectivity and backend status.
+
+ISSUE: AI returns mock/offline responses instead of real AI
+-----------------------------------------------------------
+Cause: HuggingFace API token not configured or invalid
+Solution:
+1. Check backend/.env has valid HUGGINGFACE_API_TOKEN
+2. Restart backend server: pkill -f uvicorn && uvicorn app.main:app --reload
+3. Verify with: python3 -c "from app.services.tutor import get_ai_tutor; t=get_ai_tutor(); print(t.llm_client)"
+
+ISSUE: 404 errors with doubled paths (/api/v1/api/v1/...)
+---------------------------------------------------------
+Cause: Frontend NEXT_PUBLIC_API_BASE_URL incorrectly includes /api/v1
+Solution: Set NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 (no /api/v1 suffix)
+
+ISSUE: Login redirects to home page / CORS errors
+-------------------------------------------------
+Cause: CORS not configured for the origin you're accessing from
+Solution: 
+- Access via http://127.0.0.1:3000 (not localhost if that's not in CORS)
+- Or add your origin to backend/app/main.py origins list
+
+ISSUE: Empty questions array returned from Practice Quiz
+--------------------------------------------------------
+Cause: LLM response not parsed correctly (JSON format issue)
+Solution: 
+- Check backend logs for parsing errors
+- Verify RAG context is being retrieved (check syllabus/materials exist)
+- Test directly: curl -X POST "http://127.0.0.1:8000/api/v1/tutor/generate-questions?course_id=1" -H "Authorization: Bearer {token}" -d '{"week_number":1,"num_questions":3,"difficulty":"medium"}'
+
+ISSUE: "Could not validate credentials" error
+---------------------------------------------
+Cause: JWT token expired or invalid
+Solution: Log out and log in again to get a fresh token
+
+
+================================================================================
+7. DEVELOPMENT GUIDELINES
+================================================================================
+
+WHEN ADDING NEW API ENDPOINTS
+-----------------------------
+1. Backend: Add endpoint in backend/app/api/v1/endpoints/
+2. Backend: Register router in backend/app/api/v1/api.py
+3. Frontend: Call using apiFetch() from lib/api.ts
+4. Frontend: Path should include /api/v1 prefix (e.g., "/api/v1/my-endpoint")
+
+WHEN MODIFYING AI PROMPTS
+-------------------------
+Location: backend/app/services/tutor/ai_tutor.py
+- PROMPTS dict contains all LLM prompts
+- Test changes with direct API calls before frontend integration
+- MCQ generation requires specific JSON format - see generate_questions prompt
+
+WHEN ADDING FRONTEND PAGES
+--------------------------
+1. Create page in frontend/src/app/{route}/page.tsx
+2. Use useRequireRole() hook for auth protection
+3. Use apiFetch() for API calls (auto-includes auth token)
+4. Remember: NEXT_PUBLIC_API_BASE_URL does NOT include /api/v1
+
+CODE STYLE NOTES
+----------------
+- Backend: FastAPI with Pydantic models for validation
+- Frontend: TypeScript with strict types preferred
+- Use existing patterns - check similar files for conventions
+- Don't add comments unless they explain WHY, not WHAT
+
+
+================================================================================
+8. API ENDPOINTS REFERENCE
+================================================================================
+
+AUTHENTICATION
+--------------
+POST /api/v1/auth/login          - Login (form-urlencoded: username, password)
+POST /api/v1/auth/register       - Register new user
+GET  /api/v1/users/me            - Get current user info
+
+TUTOR (AI Features)
+-------------------
+POST /api/v1/tutor/generate-questions?course_id={id}  - Generate practice MCQs
+POST /api/v1/tutor/explain?course_id={id}             - Get topic explanation
+POST /api/v1/tutor/chat?course_id={id}                - Chat with AI tutor
+POST /api/v1/tutor/check-answer                       - Check answer & get feedback
+POST /api/v1/tutor/hint?course_id={id}                - Get hint for problem
+GET  /api/v1/tutor/weak-topics?course_id={id}         - Get student's weak topics
+
+DASHBOARD
+---------
+GET  /api/v1/dashboard/student              - Student dashboard data
+GET  /api/v1/dashboard/student/course/{id}  - Course detail for student
+GET  /api/v1/dashboard/lecturer             - Lecturer dashboard data
+
+MATERIALS
+---------
+POST /api/v1/materials/upload               - Upload material file
+GET  /api/v1/materials/{id}                 - Get material details
+POST /api/v1/materials/{id}/rate            - Rate a material
+
+
+================================================================================
+9. DATABASE NOTES
+================================================================================
+
+DEVELOPMENT DATABASE
+--------------------
+- Location: backend/demo.db (SQLite)
+- Reset: Delete demo.db and restart backend to recreate
+
+KEY MODELS
+----------
+- User: id, email, full_name, role (student/lecturer/super_admin)
+- Course: id, name, code, lecturer_id
+- Syllabus: course_id, week_number, topic, content
+- Material: id, title, url, content_text, embedding
+- MaterialTopic: material_id, course_id, week_number, approved_by_lecturer
+- QuizAttempt: student_id, course_id, week_number, score, is_correct
+- TopicPerformance: student_id, course_id, week_number, average_score, is_weak_topic
+
+MIGRATIONS
+----------
+Using Alembic: cd backend && alembic revision --autogenerate -m "description"
+Apply: alembic upgrade head
+
+
+================================================================================
+10. FUTURE ENHANCEMENT CONSIDERATIONS
+================================================================================
+
+KNOWN ARCHITECTURAL ISSUES TO ADDRESS
+-------------------------------------
+1. **Monolithic page component**: frontend/src/app/student/course/[courseId]/page.tsx
+   is 844 lines. Should be split into smaller components.
+
+2. **Singleton pattern in backend**: AITutor uses global singleton which is not
+   thread-safe. Consider dependency injection with FastAPI's Depends().
+
+3. **No request cancellation**: Frontend doesn't cancel in-flight requests on
+   component unmount. Add AbortController to apiFetch calls.
+
+4. **Shared error state**: actionError in course page affects all weeks.
+   Should be per-week error state.
+
+5. **Hard-coded week count**: 14 weeks is hardcoded. Make configurable per course.
+
+6. **No caching**: Each AI request re-computes everything. Add Redis caching.
+
+7. **No rate limiting**: AI endpoints have no rate limits. Add middleware.
+
+SECURITY IMPROVEMENTS NEEDED
+----------------------------
+1. Replace eval() in answer_checker.py with ast.literal_eval()
+2. Add rate limiting to AI endpoints
+3. Sanitize user inputs before sending to LLM
+
+PERFORMANCE IMPROVEMENTS
+------------------------
+1. Add response caching for repeated question generation
+2. Implement lazy loading for course materials
+3. Add pagination for practice history
+4. Optimize RAG context retrieval with vector database
+
+
+================================================================================
+                              END OF PROJECT NOTES
+================================================================================
