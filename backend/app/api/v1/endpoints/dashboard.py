@@ -655,12 +655,27 @@ def get_lecturer_dashboard(
             pending_approvals=pending
         ))
     
-    # Get recent submissions
-    recent_submissions = (
-        db.query(models.QuizAttempt)
+    # Get recent submissions - aggregated by session (student + course + week + date)
+    # Group attempts that happened on the same day as one "session"
+    recent_sessions = (
+        db.query(
+            models.QuizAttempt.student_id,
+            models.QuizAttempt.course_id,
+            models.QuizAttempt.week_number,
+            func.sum(models.QuizAttempt.score).label("total_score"),
+            func.sum(models.QuizAttempt.max_score).label("total_max_score"),
+            func.count(models.QuizAttempt.id).label("questions_count"),
+            func.max(models.QuizAttempt.attempted_at).label("last_attempted_at"),
+        )
         .join(models.Course, models.QuizAttempt.course_id == models.Course.id)
         .filter(models.Course.lecturer_id == current_user.id)
-        .order_by(desc(models.QuizAttempt.attempted_at))
+        .group_by(
+            models.QuizAttempt.student_id,
+            models.QuizAttempt.course_id,
+            models.QuizAttempt.week_number,
+            func.date(models.QuizAttempt.attempted_at),  # Group by date
+        )
+        .order_by(desc(func.max(models.QuizAttempt.attempted_at)))
         .limit(10)
         .all()
     )
@@ -670,10 +685,11 @@ def get_lecturer_dashboard(
             "student_id": s.student_id,
             "course_id": s.course_id,
             "week_number": s.week_number,
-            "score": (s.score / s.max_score * 100) if s.max_score > 0 else 0,
-            "attempted_at": s.attempted_at.isoformat() if s.attempted_at else None
+            "score": (s.total_score / s.total_max_score * 100) if s.total_max_score > 0 else 0,
+            "questions_answered": s.questions_count,
+            "attempted_at": s.last_attempted_at.isoformat() if s.last_attempted_at else None
         }
-        for s in recent_submissions
+        for s in recent_sessions
     ]
 
     # Context bundles per course (limited for dashboard view)

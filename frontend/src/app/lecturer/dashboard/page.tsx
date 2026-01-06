@@ -21,6 +21,7 @@ type Submission = {
   course_id: number;
   week_number: number;
   score: number;
+  questions_answered?: number;
   attempted_at?: string | null;
 };
 
@@ -278,6 +279,7 @@ export default function LecturerDashboardPage() {
                 )}
                 {data.recent_submissions.map((submission, index) => {
                   const score = submission.score ?? 0;
+                  const questionsAnswered = submission.questions_answered ?? 1;
                   const scoreColor = score >= 70 ? "text-emerald-600 bg-emerald-50" : score >= 40 ? "text-amber-600 bg-amber-50" : "text-red-600 bg-red-50";
                   const scoreIcon = score >= 70 ? "✅" : score >= 40 ? "📊" : "📝";
                   const timeAgo = submission.attempted_at ? getRelativeTime(new Date(submission.attempted_at)) : "Unknown";
@@ -297,7 +299,7 @@ export default function LecturerDashboardPage() {
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          Week {submission.week_number} · {timeAgo}
+                          Week {submission.week_number} · {questionsAnswered} Q · {timeAgo}
                         </p>
                       </div>
                     </div>
