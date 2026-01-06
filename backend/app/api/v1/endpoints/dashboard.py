@@ -670,7 +670,7 @@ def get_lecturer_dashboard(
             "student_id": s.student_id,
             "course_id": s.course_id,
             "week_number": s.week_number,
-            "score": s.score,
+            "score": (s.score / s.max_score * 100) if s.max_score > 0 else 0,
             "attempted_at": s.attempted_at.isoformat() if s.attempted_at else None
         }
         for s in recent_submissions
