@@ -153,8 +153,8 @@ export default function LecturerDashboardPage() {
         headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({ crawler_type: "all", max_items: 5 }),
       });
-      // Show success feedback (simulated toast for now)
-      alert("✨ AI Agent started! It's scouting the web for new resources. Check back in a few minutes.");
+      // Redirect to materials approval page
+      router.push("/lecturer/materials");
     } catch (err: any) {
       alert(err.message ?? "Failed to start crawler");
     } finally {
@@ -223,12 +223,14 @@ export default function LecturerDashboardPage() {
             subtext="Normalized 0-100% across all topic attempts"
             tooltip="Average of individual topic performance scores for all students."
           />
-          <SummaryCard
-            label="Pending approvals"
-            value={data.pending_material_approvals}
-            subtext="Materials awaiting review"
-            variant="warning"
-          />
+          <Link href="/lecturer/materials" className="block">
+            <SummaryCard
+              label="Pending approvals"
+              value={data.pending_material_approvals}
+              subtext="Click to review →"
+              variant="warning"
+            />
+          </Link>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-3">
