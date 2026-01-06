@@ -135,7 +135,7 @@ export default function StudentCourseDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [personalizedRecs, setPersonalizedRecs] = useState<PersonalizedRecommendation[]>([]);
   const [bundles, setBundles] = useState<ContextBundle[]>([]);
-  const [recsLoading, setRecsLoading] = useState(true);
+  const [recsLoading, setRecsLoading] = useState(false);
   const [ratings, setRatings] = useState<Record<number, RatingSummary>>({});
   const [ratingInFlight, setRatingInFlight] = useState<number | null>(null);
   const [likedRecs, setLikedRecs] = useState<Set<number>>(new Set());
@@ -511,7 +511,7 @@ export default function StudentCourseDetailPage() {
               ))}
             </div>
           </section>
-        ) : recsLoading ? (
+        ) : recsLoading && personalizedRecs.length === 0 && bundles.length === 0 ? (
           <SmartFeedSkeleton />
         ) : (
           <div className="flex flex-col gap-6">
