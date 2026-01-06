@@ -88,7 +88,10 @@ function MaterialsContent() {
           name: c.course_name,
         }));
         setCourses(options);
-        setSelectedCourse((prev) => prev ?? initialCourseId ?? options[0]?.id ?? null);
+        // Always set first course if no course selected
+        if (options.length > 0) {
+          setSelectedCourse((prev) => prev || initialCourseId || options[0].id);
+        }
         setError(null);
       } catch (err: any) {
         setError(err.message ?? "Unable to load courses");
@@ -292,12 +295,25 @@ function MaterialsContent() {
     );
   }
 
-  if (!selectedCourse) {
+  if (courses.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 px-4 py-10">
         <div className="mx-auto max-w-6xl">
           <div className="rounded-xl bg-white p-6 shadow-sm">
             <p className="text-sm text-gray-500">No courses available to review materials.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show loading while auto-selecting first course
+  if (!selectedCourse) {
+    return (
+      <div className="min-h-screen bg-gray-50 px-4 py-10">
+        <div className="mx-auto max-w-6xl">
+          <div className="rounded-xl bg-white p-6 shadow-sm">
+            <p className="text-sm text-gray-500">Loading materials...</p>
           </div>
         </div>
       </div>
