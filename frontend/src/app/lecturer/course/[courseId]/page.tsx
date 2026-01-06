@@ -247,28 +247,56 @@ export default function LecturerCourseDetailPage() {
         {courseDetail && (
           <section className="grid gap-4 lg:grid-cols-3">
             <div className="rounded-2xl bg-white p-6 shadow-sm lg:col-span-2">
-              <h2 className="text-lg font-semibold text-gray-900">Course description</h2>
-              <p className="mt-2 text-sm text-gray-600">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100">
+                  <span className="text-xl">📚</span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Course Overview</h2>
+                  <p className="text-xs text-gray-500">Course details and information</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed">
                 {courseDetail.description || "No description provided for this course yet."}
               </p>
-              <dl className="mt-4 grid gap-4 sm:grid-cols-2 text-sm text-gray-500">
-                <div>
-                  <dt className="uppercase tracking-wide text-xs text-gray-400">Lecturer</dt>
-                  <dd className="mt-1 text-gray-900">{courseDetail.lecturer_name || "Unassigned"}</dd>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100">
+                    <span className="text-base">👨‍🏫</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Lecturer</p>
+                    <p className="text-sm font-medium text-gray-900">{courseDetail.lecturer_name || "Unassigned"}</p>
+                  </div>
                 </div>
-                <div>
-                  <dt className="uppercase tracking-wide text-xs text-gray-400">Created</dt>
-                  <dd className="mt-1 text-gray-900">{createdDate ?? "—"}</dd>
+                <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100">
+                    <span className="text-base">📅</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Created</p>
+                    <p className="text-sm font-medium text-gray-900">{createdDate ?? "—"}</p>
+                  </div>
                 </div>
-                <div>
-                  <dt className="uppercase tracking-wide text-xs text-gray-400">Last updated</dt>
-                  <dd className="mt-1 text-gray-900">{updatedDate ?? "—"}</dd>
+                <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100">
+                    <span className="text-base">🔄</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Last Updated</p>
+                    <p className="text-sm font-medium text-gray-900">{updatedDate ?? "—"}</p>
+                  </div>
                 </div>
-                <div>
-                  <dt className="uppercase tracking-wide text-xs text-gray-400">Syllabus weeks</dt>
-                  <dd className="mt-1 text-gray-900">{syllablesCount}</dd>
+                <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-100">
+                    <span className="text-base">📖</span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Syllabus Weeks</p>
+                    <p className="text-sm font-medium text-gray-900">{syllablesCount} weeks</p>
+                  </div>
                 </div>
-              </dl>
+              </div>
             </div>
             <div className="rounded-2xl bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900">Quick actions</h2>
