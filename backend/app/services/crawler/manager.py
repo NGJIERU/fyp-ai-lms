@@ -1,11 +1,13 @@
 import logging
-from typing import List, Type, Dict
+from typing import List, Type, Dict, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
 import traceback
 
 from app.core.database import SessionLocal
-from app.models.material import Material, CrawlLog
+from app.models.material import Material, CrawlLog, MaterialTopic
+from app.models.syllabus import Syllabus
+from app.models.course import Course
 from app.services.crawler.base import BaseCrawler
 
 logger = logging.getLogger(__name__)
@@ -85,6 +87,12 @@ class CrawlerManager:
 
                 new_material = Material(**material_data)
                 db.add(new_material)
+                db.flush()  # Get the material ID
+                
+                # Auto-map to relevant courses based on syllabus matching
+                mappings_created = self._auto_map_material(db, new_material)
+                logger.debug(f"Created {mappings_created} mappings for material {new_material.id}")
+                
                 items_saved += 1
             
             db.commit()
@@ -107,3 +115,69 @@ class CrawlerManager:
             db.commit()
         finally:
             db.close()
+    
+    def _auto_map_material(self, db: Session, material: Material) -> int:
+        """
+        Auto-map a crawled material to relevant courses based on keyword matching.
+        Creates MaterialTopic entries with approved_by_lecturer=False for review.
+        
+        Returns number of mappings created.
+        """
+        mappings_created = 0
+        
+        # Get material text for matching
+        material_text = f"{material.title or ''} {material.description or ''} {material.content_text or ''}".lower()
+        
+        # Get all active syllabuses
+        syllabuses = (
+            db.query(Syllabus)
+            .filter(Syllabus.is_active == True)
+            .all()
+        )
+        
+        for syllabus in syllabuses:
+            # Simple keyword matching based on syllabus topic
+            topic_keywords = syllabus.topic.lower().split()
+            
+            # Check if any significant keywords match (skip common words)
+            common_words = {'to', 'the', 'and', 'or', 'a', 'an', 'in', 'of', 'for', 'with', '&', '-'}
+            significant_keywords = [kw for kw in topic_keywords if kw not in common_words and len(kw) > 2]
+            
+            # Count matches
+            matches = sum(1 for kw in significant_keywords if kw in material_text)
+            
+            # Require at least 2 keyword matches or 50% of keywords
+            min_matches = max(2, len(significant_keywords) // 2)
+            
+            if matches >= min_matches:
+                # Check if mapping already exists
+                existing = (
+                    db.query(MaterialTopic)
+                    .filter(
+                        MaterialTopic.material_id == material.id,
+                        MaterialTopic.course_id == syllabus.course_id,
+                        MaterialTopic.week_number == syllabus.week_number
+                    )
+                    .first()
+                )
+                
+                if not existing:
+                    # Calculate relevance score based on match ratio
+                    relevance_score = min(matches / len(significant_keywords), 1.0) if significant_keywords else 0.5
+                    
+                    mapping = MaterialTopic(
+                        material_id=material.id,
+                        course_id=syllabus.course_id,
+                        week_number=syllabus.week_number,
+                        relevance_score=relevance_score,
+                        approved_by_lecturer=False  # Pending review!
+                    )
+                    db.add(mapping)
+                    mappings_created += 1
+                    
+                    logger.info(
+                        f"Auto-mapped material {material.id} to course {syllabus.course_id} "
+                        f"week {syllabus.week_number} (relevance: {relevance_score:.2f})"
+                    )
+        
+        return mappings_created
