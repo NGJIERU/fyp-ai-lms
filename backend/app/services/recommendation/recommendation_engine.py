@@ -13,6 +13,7 @@ from app.models.syllabus import Syllabus
 from app.models.course import Course
 from app.models.performance import TopicPerformance
 from app.services.processing.embedding_service import EmbeddingService, get_embedding_service
+from app.services.processing.embedding_cache import EmbeddingCache, get_embedding_cache
 from app.services.processing.quality_scorer import QualityScorer, get_quality_scorer
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ class RecommendationEngine:
     def __init__(
         self,
         embedding_service: Optional[EmbeddingService] = None,
+        embedding_cache: Optional[EmbeddingCache] = None,
         quality_scorer: Optional[QualityScorer] = None
     ):
         """
@@ -44,9 +46,11 @@ class RecommendationEngine:
         
         Args:
             embedding_service: Service for generating embeddings
+            embedding_cache: Cache for embeddings (recommended)
             quality_scorer: Service for calculating quality scores
         """
         self.embedding_service = embedding_service or get_embedding_service()
+        self.embedding_cache = embedding_cache or get_embedding_cache()
         self.quality_scorer = quality_scorer or get_quality_scorer()
     
     def recommend_for_topic(
@@ -89,8 +93,8 @@ class RecommendationEngine:
             logger.warning(f"No active syllabus found for course {course_id}, week {week_number}")
             return []
         
-        # Generate embedding for the topic
-        topic_embedding = self.embedding_service.embed_syllabus_topic(
+        # Generate embedding for the topic (using cache)
+        topic_embedding = self.embedding_cache.get_syllabus_embedding(
             syllabus.topic,
             syllabus.content or ""
         )
@@ -124,11 +128,11 @@ class RecommendationEngine:
         # Calculate similarities and rank
         recommendations = []
         for material in materials:
-            # Get or compute material embedding
-            material_embedding = self._get_material_embedding(material)
+            # Get or compute material embedding (with caching)
+            material_embedding = self._get_material_embedding(material, db)
             
             # Calculate similarity
-            similarity = self.embedding_service.compute_similarity(
+            similarity = self.embedding_cache.compute_similarity(
                 topic_embedding,
                 material_embedding
             )
@@ -338,22 +342,20 @@ class RecommendationEngine:
         
         return results
     
-    def _get_material_embedding(self, material: Material) -> List[float]:
+    def _get_material_embedding(
+        self, 
+        material: Material, 
+        db: Optional[Session] = None
+    ) -> List[float]:
         """
-        Get or compute embedding for a material.
-        """
-        # If embedding is stored, use it
-        if material.embedding:
-            return material.embedding
+        Get or compute embedding for a material using cache.
         
-        # Otherwise, compute it
-        material_data = {
-            "title": material.title,
-            "description": material.description,
-            "snippet": material.snippet,
-            "content_text": material.content_text,
-        }
-        return self.embedding_service.embed_material(material_data)
+        Args:
+            material: Material to get embedding for
+            db: Database session for persisting embeddings
+        """
+        # Use the embedding cache which handles DB lookup, memory cache, and persistence
+        return self.embedding_cache.get_material_embedding(material, db, persist=True)
 
     def _calculate_combined_score(
         self,
