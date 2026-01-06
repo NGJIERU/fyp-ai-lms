@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import TutorExplanation from "@/components/tutor/TutorExplanation";
+import RecommendationCard from "@/components/recommendations/RecommendationCard";
+import BundleCard from "@/components/recommendations/BundleCard";
 import { useParams, useRouter } from "next/navigation";
 
 import { apiFetch } from "@/lib/api";
@@ -522,49 +524,39 @@ export default function StudentCourseDetailPage() {
               </header>
               <div className="mt-5 space-y-4">
                 {filteredPersonalizedRecs.length === 0 && (
-                  <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
-                    {personalizedRecs.length > 0 ? "You're all caught up! Check the Weekly Review Kits for general study." : "No personalized recommendations yet—complete a few practice questions to get tailored suggestions."}
-                  </p>
+                  <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 text-center">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                      <span className="text-2xl">🎯</span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-700">
+                      {personalizedRecs.length > 0 ? "You're all caught up!" : "No recommendations yet"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {personalizedRecs.length > 0 
+                        ? "Check the Weekly Review Kits below for general study materials." 
+                        : "Complete a few practice questions to get tailored suggestions."}
+                    </p>
+                  </div>
                 )}
                 {filteredPersonalizedRecs
                   .filter(rec => !hiddenRecs.has(rec.material.id))
-                  .map((rec) => {
-                    const isLiked = likedRecs.has(rec.material.id);
-                    return (
-                      <div
-                        key={`${rec.material.id}-${rec.week_number}`}
-                        className={`rounded-xl border p-4 transition-all duration-300 ${isLiked ? 'border-green-200 bg-green-50 shadow-sm' : 'border-gray-100 bg-white'}`}
-                      >
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className={`text-sm font-semibold ${isLiked ? 'text-green-900' : 'text-gray-900'}`}>{rec.material.title}</p>
-                              <p className={`text-xs ${isLiked ? 'text-green-700' : 'text-gray-500'}`}>Week {rec.week_number} · {rec.topic}</p>
-                            </div>
-                            <a href={rec.material.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-indigo-600" onClick={() => handleMaterialClick(rec.material.id)}>
-                              Open ↗
-                            </a>
-                          </div>
-                          <p className={`text-xs ${isLiked ? 'text-green-800' : 'text-gray-500'}`}>{rec.reasons.join(" ")} </p>
-                          <div className={`flex items-center gap-4 text-xs ${isLiked ? 'text-green-600' : 'text-gray-400'}`}>
-                            <span>Score {(rec.personalized_score * 100).toFixed(0)}%</span>
-                            <span>Similarity {(rec.similarity_score * 100).toFixed(0)}%</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <button type="button" disabled={ratingInFlight === rec.material.id} className={`rounded-md border px-3 py-1 text-xs font-semibold transition-colors ${isLiked ? 'border-green-300 bg-white text-green-700 shadow-sm' : 'border-gray-200 text-gray-700 hover:border-indigo-200'}`} onClick={() => handleRateMaterial(rec.material.id, 1)}>
-                              {isLiked ? '✓ Saved' : '👍 Helpful'}
-                            </button>
-                            <button type="button" disabled={ratingInFlight === rec.material.id} className="rounded-md border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700" onClick={() => handleRateMaterial(rec.material.id, -1)}>
-                              👎 Not for me
-                            </button>
-                            {ratings[rec.material.id] && (
-                              <span className="text-xs text-gray-400">{ratings[rec.material.id].upvotes}↑ / {ratings[rec.material.id].downvotes}↓</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  .map((rec) => (
+                    <RecommendationCard
+                      key={`${rec.material.id}-${rec.week_number}`}
+                      material={rec.material}
+                      weekNumber={rec.week_number}
+                      topic={rec.topic}
+                      reasons={rec.reasons}
+                      personalizedScore={rec.personalized_score}
+                      similarityScore={rec.similarity_score}
+                      qualityScore={rec.quality_score}
+                      isLiked={likedRecs.has(rec.material.id)}
+                      ratingInFlight={ratingInFlight === rec.material.id}
+                      ratings={ratings[rec.material.id]}
+                      onRate={handleRateMaterial}
+                      onMaterialClick={handleMaterialClick}
+                    />
+                  ))}
               </div>
             </section>
             {bundles.length > 0 && (
@@ -584,27 +576,14 @@ export default function StudentCourseDetailPage() {
                 </header>
                 <div className="mt-6 space-y-4">
                   {bundles.map((bundle) => (
-                    <div key={`${bundle.week_number}-${bundle.topic}`} className="rounded-xl border border-gray-100 p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            Week {bundle.week_number}: {bundle.topic}
-                          </p>
-                          <p className="text-xs text-gray-500">{bundle.summary}</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 space-y-2">
-                        {bundle.materials.map((material) => (
-                          <a key={material.id} href={material.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:border-indigo-200" onClick={() => handleMaterialClick(material.id)}>
-                            <span>
-                              <span className="font-medium text-gray-900">{material.title}</span>
-                              <span className="ml-2 text-xs uppercase text-gray-400">{material.source}</span>
-                            </span>
-                            <span className="text-xs text-gray-400">Launch ↗</span>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
+                    <BundleCard
+                      key={`${bundle.week_number}-${bundle.topic}`}
+                      weekNumber={bundle.week_number}
+                      topic={bundle.topic}
+                      summary={bundle.summary}
+                      materials={bundle.materials}
+                      onMaterialClick={handleMaterialClick}
+                    />
                   ))}
                 </div>
               </section>
