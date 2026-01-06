@@ -178,9 +178,11 @@ export default function StudentDashboardPage() {
             </h2>
             <div className="mt-4 space-y-4">
               {data.recent_activity.length === 0 && (
-                <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
-                  No activity yet.
-                </p>
+                <div className="rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 p-6 text-center">
+                  <span className="text-3xl">🚀</span>
+                  <p className="mt-2 text-sm font-medium text-gray-700">Ready to start learning?</p>
+                  <p className="mt-1 text-xs text-gray-500">Your activity will appear here as you explore courses and take quizzes.</p>
+                </div>
               )}
               {data.recent_activity.map((item, index) => (
                 <div key={`${item.action}-${index}`} className="flex gap-3">

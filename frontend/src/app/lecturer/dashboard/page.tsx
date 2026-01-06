@@ -240,9 +240,11 @@ export default function LecturerDashboardPage() {
             </div>
             <div className="mt-6 space-y-4">
               {data.courses.length === 0 && (
-                <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
-                  You have no active courses yet.
-                </p>
+                <div className="rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 p-6 text-center">
+                  <span className="text-3xl">📚</span>
+                  <p className="mt-2 text-sm font-medium text-gray-700">No courses assigned yet</p>
+                  <p className="mt-1 text-xs text-gray-500">Contact your administrator to get courses assigned to your account.</p>
+                </div>
               )}
               {data.courses.map((course) => (
                 <CourseRow key={course.course_id} course={course} />
@@ -286,9 +288,11 @@ export default function LecturerDashboardPage() {
               </p>
               <div className="mt-4 space-y-3">
                 {data.rating_insights.length === 0 && (
-                  <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
-                    No rating insights yet. Students haven&apos;t rated enough materials.
-                  </p>
+                  <div className="rounded-lg bg-emerald-50 p-4 text-center">
+                    <span className="text-2xl">✨</span>
+                    <p className="mt-1 text-xs font-medium text-emerald-700">All materials performing well!</p>
+                    <p className="mt-1 text-xs text-emerald-600">No low-rated content to review.</p>
+                  </div>
                 )}
                 {data.rating_insights.map((insight) => (
                   <div
@@ -436,9 +440,11 @@ function StudyBundlesSection({
       </p>
       <div className="mt-4 space-y-2">
         {bundles.length === 0 && (
-          <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
-            No bundles yet. Approve materials and generate recommendations to see kits here.
-          </p>
+          <div className="rounded-lg bg-indigo-50 p-4 text-center">
+            <span className="text-2xl">📦</span>
+            <p className="mt-1 text-xs font-medium text-indigo-700">No study bundles yet</p>
+            <p className="mt-1 text-xs text-indigo-600">Approve materials to generate AI-curated weekly kits.</p>
+          </div>
         )}
         {displayedCourseIds.map((courseId) => {
           const course = courses.find((c) => c.course_id === courseId);
