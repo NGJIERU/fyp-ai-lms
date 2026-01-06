@@ -203,23 +203,23 @@ function formatBoldText(text: string, baseKey: number): React.ReactNode {
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match;
-  let key = baseKey;
+  let key = 0;
   
   while ((match = boldRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(<span key={key++}>{text.slice(lastIndex, match.index)}</span>);
+      parts.push(<span key={`bold-${baseKey}-${key++}`}>{text.slice(lastIndex, match.index)}</span>);
     }
     parts.push(
-      <span key={key++} className="font-semibold text-gray-900">{match[1]}</span>
+      <span key={`bold-${baseKey}-${key++}`} className="font-semibold text-gray-900">{match[1]}</span>
     );
     lastIndex = match.index + match[0].length;
   }
   
   if (lastIndex < text.length) {
-    parts.push(<span key={key++}>{text.slice(lastIndex)}</span>);
+    parts.push(<span key={`bold-${baseKey}-${key++}`}>{text.slice(lastIndex)}</span>);
   }
   
-  return parts.length > 0 ? <>{parts}</> : <span>{text}</span>;
+  return parts.length > 0 ? <span key={`bold-wrap-${baseKey}`}>{parts}</span> : <span key={`bold-text-${baseKey}`}>{text}</span>;
 }
 
 function SubsectionIcon({ type }: { type: string }) {
