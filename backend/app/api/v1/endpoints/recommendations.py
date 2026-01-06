@@ -10,6 +10,7 @@ from app import models
 from app.api import deps
 from app.core.database import get_db
 from app.services.recommendation import get_recommendation_engine
+from app.services.processing.embedding_cache import get_embedding_cache
 
 router = APIRouter()
 
@@ -485,4 +486,21 @@ def trigger_embedding_update(
         "status": "success",
         "materials_updated": updated,
         "message": f"Updated embeddings for {updated} materials"
+    }
+
+
+@router.get("/cache-stats")
+async def get_cache_stats(
+    current_user: models.User = Depends(deps.get_current_user)
+):
+    """
+    Get embedding cache statistics.
+    Useful for monitoring cache performance.
+    """
+    cache = get_embedding_cache()
+    stats = cache.get_stats()
+    
+    return {
+        "status": "success",
+        "cache_stats": stats
     }
