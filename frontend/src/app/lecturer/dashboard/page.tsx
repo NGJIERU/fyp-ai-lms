@@ -275,53 +275,7 @@ export default function LecturerDashboardPage() {
               </div>
             </div>
 
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Study bundles</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                AI-curated kits per week, built from your approved materials.
-              </p>
-              <div className="mt-4 space-y-3">
-                {data.context_bundles.length === 0 && (
-                  <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
-                    No bundles yet. Approve materials and generate recommendations to see kits here.
-                  </p>
-                )}
-                {data.context_bundles.map((bundle, index) => {
-                  const course = data.courses.find((c) => c.course_id === bundle.course_id);
-                  return (
-                    <div
-                      key={`${bundle.course_id}-${bundle.week_number}-${index}`}
-                      className="rounded-lg border border-gray-100 p-3"
-                    >
-                      <p className="text-xs uppercase tracking-wide text-indigo-600">
-                        {course?.course_code} · {course?.course_name}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900">
-                        Week {bundle.week_number}: {bundle.topic}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500 line-clamp-2">{bundle.summary}</p>
-                      <div className="mt-2 space-y-1">
-                        {bundle.materials.map((mat) => (
-                          <a
-                            key={mat.id}
-                            href={mat.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center justify-between rounded-md border border-gray-100 px-2 py-1 text-[0.7rem] text-gray-700 hover:border-indigo-200"
-                          >
-                            <span className="truncate">
-                              <span className="font-medium text-gray-900">{mat.title}</span>
-                              <span className="ml-1 text-[0.6rem] uppercase text-gray-400">{mat.source}</span>
-                            </span>
-                            <span className="text-[0.6rem] text-gray-400">Open ↗</span>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <StudyBundlesSection bundles={data.context_bundles} courses={data.courses} />
 
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Low-rated materials</h2>
@@ -431,6 +385,136 @@ function CourseRow({ course }: { course: LecturerCourseStats }) {
         <span>Class Avg Score</span>
         <span className="font-mono font-medium text-gray-900">{course.avg_class_score.toFixed(1)}%</span>
       </Link>
+    </div>
+  );
+}
+
+function StudyBundlesSection({
+  bundles,
+  courses,
+}: {
+  bundles: LecturerBundleItem[];
+  courses: LecturerCourseStats[];
+}) {
+  const [expandedCourses, setExpandedCourses] = useState<Set<number>>(new Set());
+  const [showAll, setShowAll] = useState(false);
+
+  // Group bundles by course
+  const bundlesByCourse = useMemo(() => {
+    const grouped: Record<number, LecturerBundleItem[]> = {};
+    bundles.forEach((bundle) => {
+      if (!grouped[bundle.course_id]) {
+        grouped[bundle.course_id] = [];
+      }
+      grouped[bundle.course_id].push(bundle);
+    });
+    return grouped;
+  }, [bundles]);
+
+  const courseIds = Object.keys(bundlesByCourse).map(Number);
+  const displayedCourseIds = showAll ? courseIds : courseIds.slice(0, 2);
+
+  const toggleCourse = (courseId: number) => {
+    setExpandedCourses((prev) => {
+      const next = new Set(prev);
+      if (next.has(courseId)) {
+        next.delete(courseId);
+      } else {
+        next.add(courseId);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-gray-900">Study bundles</h2>
+      <p className="mt-1 text-sm text-gray-500">
+        AI-curated kits per week, built from your approved materials.
+      </p>
+      <div className="mt-4 space-y-2">
+        {bundles.length === 0 && (
+          <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+            No bundles yet. Approve materials and generate recommendations to see kits here.
+          </p>
+        )}
+        {displayedCourseIds.map((courseId) => {
+          const course = courses.find((c) => c.course_id === courseId);
+          const courseBundles = bundlesByCourse[courseId] || [];
+          const isExpanded = expandedCourses.has(courseId);
+
+          return (
+            <div
+              key={courseId}
+              className="rounded-lg border border-gray-100 overflow-hidden"
+            >
+              <button
+                onClick={() => toggleCourse(courseId)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-indigo-600">
+                    {course?.course_code}
+                  </span>
+                  <span className="text-xs text-gray-600 truncate">
+                    {course?.course_name}
+                  </span>
+                  <span className="text-[0.65rem] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">
+                    {courseBundles.length} weeks
+                  </span>
+                </div>
+                <svg
+                  className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {isExpanded && (
+                <div className="px-3 py-2 space-y-2 bg-white">
+                  {courseBundles.map((bundle, idx) => (
+                    <div key={idx} className="border-l-2 border-indigo-200 pl-3 py-1">
+                      <p className="text-xs font-medium text-gray-900">
+                        Week {bundle.week_number}: {bundle.topic}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {bundle.materials.slice(0, 3).map((mat) => (
+                          <a
+                            key={mat.id}
+                            href={mat.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[0.65rem] bg-gray-100 hover:bg-indigo-100 text-gray-600 hover:text-indigo-700 px-2 py-0.5 rounded transition-colors"
+                            title={mat.title}
+                          >
+                            <span className="truncate max-w-[100px]">{mat.title}</span>
+                            <span className="text-gray-400">↗</span>
+                          </a>
+                        ))}
+                        {bundle.materials.length > 3 && (
+                          <span className="text-[0.65rem] text-gray-400 px-1">
+                            +{bundle.materials.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {courseIds.length > 2 && (
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="w-full text-xs text-indigo-600 hover:text-indigo-800 py-2 text-center"
+          >
+            {showAll ? "Show less" : `Show ${courseIds.length - 2} more courses`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
