@@ -94,13 +94,7 @@ type PracticeQuestionsResponse = {
   topic: string;
   week_number: number;
   difficulty: string;
-  questions: { 
-    question: string; 
-    type?: string;
-    options?: string[] | Record<string, string>;
-    correct_answer?: string;
-    explanation?: string;
-  }[];
+  questions: { question: string; type?: string }[];
   sources: string[];
 };
 
@@ -310,7 +304,6 @@ export default function StudentCourseDetailPage() {
             num_questions: 5,
             difficulty: "medium",
           }),
-          timeout: 90000, // 90 second timeout for LLM generation
         }
       );
       setPracticeResults((prev) => ({
@@ -334,26 +327,24 @@ export default function StudentCourseDetailPage() {
     setTutorLoadingWeek(weekNumber);
     setActionError(null);
 
-    // Contextual Link: If questions are already generated, send them to the tutor!
+    // Build context from existing quiz questions if available
     const existingQuestions = practiceResults[weekNumber];
-    let promptTopic = topic;
+    let questionsContext: string | undefined;
     if (existingQuestions && existingQuestions.questions.length > 0) {
       const questionList = existingQuestions.questions.map((q, i) => `${i + 1}. ${q.question}`).join("\n");
-      promptTopic = `Explain the key concepts needed to answer these practice questions:\n${questionList}`;
+      questionsContext = `Explain the key concepts needed to answer these practice questions:\n${questionList}`;
     }
 
     try {
-      // NOTE: We are "hijacking" the topic field to pass the fuller prompt. 
-      // Ideally backend should have a separate 'context' field, but this works with the existing API
-      // because the backend uses the 'topic' field to search RAG and prompt the LLM.
       const response = await apiFetch<ExplainResponse>(`/api/v1/tutor/explain?course_id=${data.course_id}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          topic: promptTopic,
+          topic: topic,
           week_number: weekNumber,
+          context: questionsContext,
         }),
       });
       setTutorResponses((prev) => ({
@@ -506,6 +497,8 @@ export default function StudentCourseDetailPage() {
                   onAskTutor={() => handleAskTutor(week.week_number, week.topic)}
                   isGenerating={practiceLoadingWeek === week.week_number}
                   isAskingTutor={tutorLoadingWeek === week.week_number}
+                  error={actionError}
+                  onClearError={() => setActionError(null)}
                 />
               ))}
             </div>
@@ -693,6 +686,8 @@ function WeekCard({
   onAskTutor,
   isGenerating,
   isAskingTutor,
+  error,
+  onClearError,
 }: {
   week: WeeklyProgress;
   practiceResult: PracticeQuestionsResponse | null;
@@ -701,6 +696,8 @@ function WeekCard({
   onAskTutor: () => void;
   isGenerating: boolean;
   isAskingTutor: boolean;
+  error: string | null;
+  onClearError: () => void;
 }) {
   const [mode, setMode] = useState<WeekCardMode>("overview");
 
@@ -761,6 +758,12 @@ function WeekCard({
                 <button type="button" onClick={onGenerateQuestions} disabled={isGenerating} className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-60 transition">
                   {isGenerating ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Generating...</> : "Generate Questions"}
                 </button>
+                {error && (
+                  <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200">
+                    <p className="text-sm text-red-600">{error}</p>
+                    <button onClick={onClearError} className="mt-2 text-xs text-red-500 hover:text-red-700 underline">Dismiss</button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -794,6 +797,12 @@ function WeekCard({
                 <button type="button" onClick={onAskTutor} disabled={isAskingTutor} className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 disabled:opacity-60 transition">
                   {isAskingTutor ? "Thinking..." : "Explain This Topic"}
                 </button>
+                {error && (
+                  <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200">
+                    <p className="text-sm text-red-600">{error}</p>
+                    <button onClick={onClearError} className="mt-2 text-xs text-red-500 hover:text-red-700 underline">Dismiss</button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">

@@ -59,17 +59,14 @@ export default function QuizModal({
                     // or we might need to modify backend to accept topic override.
                     // For now, let's rely on week_number as per API spec.
                 }),
-                timeout: 90000, // 90 second timeout for LLM generation
             });
 
-            // 2. Parse questions with proper type handling
-            // The backend may return options as either an array or dict - normalize to array
+            // 2. Parse questions - normalize options from dict to array
             const parsedQuestions: Question[] = data.questions.map((q: any) => {
                 let normalizedOptions: string[] | undefined = undefined;
                 
                 if (q.options) {
                     if (Array.isArray(q.options)) {
-                        // Already an array
                         normalizedOptions = q.options;
                     } else if (typeof q.options === 'object') {
                         // Convert dict {"A": "text", "B": "text"} to array ["A. text", "B. text"]
