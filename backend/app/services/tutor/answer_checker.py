@@ -105,16 +105,16 @@ class AnswerChecker:
         }
         
         if is_correct:
-            result["feedback"] = "Correct! Well done."
+            result["feedback"] = "✅ Correct! You've got a solid grasp of this concept."
             if mode == GradingMode.PRACTICE:
                 result["explanation"] = question.get("explanation", "")
         else:
             if mode == GradingMode.PRACTICE:
-                result["feedback"] = f"Incorrect. The correct answer is {correct_answer}."
+                result["feedback"] = f"Not quite — the correct answer is {correct_answer}. Let's see why:"
                 result["explanation"] = question.get("explanation", "")
                 result["correct_answer"] = correct_answer
             else:
-                result["feedback"] = "Incorrect. Review the relevant material and try again."
+                result["feedback"] = "Not quite right. Take another look at this topic — you're close!"
                 result["hints"] = self._generate_mcq_hints(question, student_answer)
         
         return result
@@ -175,16 +175,16 @@ class AnswerChecker:
         }
         
         if is_correct:
-            result["feedback"] = "Good answer! You covered the key concepts."
+            result["feedback"] = "✅ Great answer! You've captured the key concepts well."
         else:
             missing_keywords = [kw for kw in expected_keywords if kw not in matched_keywords]
             
             if mode == GradingMode.PRACTICE:
-                result["feedback"] = "Your answer is partially correct."
+                result["feedback"] = "Good effort! You're on the right track, but a few key points are missing."
                 result["model_answer"] = model_answer
                 result["missing_concepts"] = missing_keywords
             else:
-                result["feedback"] = "Your answer needs improvement."
+                result["feedback"] = "You're getting there! Try expanding on your answer with more detail."
                 result["hints"] = [
                     f"Consider discussing: {', '.join(missing_keywords[:2])}" if missing_keywords else "Add more detail to your answer."
                 ]
@@ -254,16 +254,16 @@ class AnswerChecker:
         }
         
         if is_correct:
-            result["feedback"] = f"All {len(test_cases)} test cases passed! Great job!"
+            result["feedback"] = f"✅ Perfect! All {len(test_cases)} test cases passed. Your code works correctly!"
         else:
             failed_tests = [r for r in test_results if not r["passed"]]
             
             if mode == GradingMode.PRACTICE:
-                result["feedback"] = f"Passed {passed_tests}/{len(test_cases)} test cases."
+                result["feedback"] = f"Good progress! {passed_tests}/{len(test_cases)} test cases passed. Review the failing cases below."
                 result["test_results"] = test_results
                 result["model_solution"] = question.get("model_solution", "")
             else:
-                result["feedback"] = f"Passed {passed_tests}/{len(test_cases)} test cases."
+                result["feedback"] = f"Almost there! {passed_tests}/{len(test_cases)} test cases passed. Check your logic for edge cases."
                 result["hints"] = self._generate_code_hints(failed_tests, question)
                 # Show only first failing test input (not expected output)
                 if failed_tests:
@@ -340,7 +340,7 @@ class AnswerChecker:
         }
         
         if is_correct:
-            result["feedback"] = "Excellent! All steps are correct."
+            result["feedback"] = "✅ Excellent work! You've solved this step-by-step correctly."
         else:
             incorrect_steps = [r for r in step_results if not r["correct"]]
             
