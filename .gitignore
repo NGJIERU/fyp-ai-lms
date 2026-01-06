@@ -7,7 +7,6 @@ node_modules/
 .venv
 venv/
 *.db
-!demo.db
 
 # Valid ignoring of FYP folders
 FYP 1 Slide/
