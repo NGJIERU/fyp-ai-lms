@@ -301,43 +301,105 @@ def create_enrollments(db: Session, users: dict):
 
 
 def create_sample_performance(db: Session, users: dict):
-    """Create sample quiz attempts and performance data."""
-    students = [u for email, u in users.items() if u.role == UserRole.STUDENT]
-    courses = db.query(Course).limit(2).all()
+    """Create sample quiz attempts and performance data with distinct student personas."""
+    import random
     
-    for student in students:
+    # Define student personas with score ranges
+    # Alice = Excellent (85-98%), Bob = Normal (55-75%), Charlie = Struggling (25-45%)
+    student_profiles = {
+        "alice@student.lms.edu": {
+            "type": "excellent",
+            "score_range": (0.85, 0.98),
+            "correct_ratio": 0.9,
+            "mastery": "proficient",
+            "attempts_range": (3, 5),
+        },
+        "bob@student.lms.edu": {
+            "type": "normal", 
+            "score_range": (0.55, 0.75),
+            "correct_ratio": 0.6,
+            "mastery": "learning",
+            "attempts_range": (2, 4),
+        },
+        "charlie@student.lms.edu": {
+            "type": "struggling",
+            "score_range": (0.25, 0.45),
+            "correct_ratio": 0.3,
+            "mastery": "needs_improvement",
+            "attempts_range": (1, 3),
+        },
+    }
+    
+    courses = db.query(Course).limit(3).all()
+    
+    for email, user in users.items():
+        if user.role != UserRole.STUDENT:
+            continue
+            
+        profile = student_profiles.get(email)
+        if not profile:
+            continue
+        
+        print(f"  Creating {profile['type']} student data for {user.full_name}...")
+        
         for course in courses:
             # Create performance for first 3 weeks
             for week in range(1, 4):
-                existing = db.query(TopicPerformance).filter(
-                    TopicPerformance.student_id == student.id,
+                # TopicPerformance
+                existing_perf = db.query(TopicPerformance).filter(
+                    TopicPerformance.student_id == user.id,
                     TopicPerformance.course_id == course.id,
                     TopicPerformance.week_number == week
                 ).first()
                 
-                if existing:
-                    continue
+                if not existing_perf:
+                    score = random.uniform(*profile["score_range"])
+                    total_attempts = random.randint(*profile["attempts_range"])
+                    correct_attempts = int(total_attempts * profile["correct_ratio"])
+                    
+                    performance = TopicPerformance(
+                        student_id=user.id,
+                        course_id=course.id,
+                        week_number=week,
+                        total_attempts=total_attempts,
+                        correct_attempts=correct_attempts,
+                        average_score=score,
+                        is_weak_topic=score < 0.6,
+                        mastery_level=profile["mastery"],
+                        last_attempt_at=datetime.utcnow() - timedelta(days=random.randint(1, 7))
+                    )
+                    db.add(performance)
                 
-                # Randomize scores a bit
-                import random
-                score = random.uniform(0.6, 0.95)
-                is_weak = score < 0.7
-                
-                performance = TopicPerformance(
-                    student_id=student.id,
-                    course_id=course.id,
-                    week_number=week,
-                    total_attempts=random.randint(2, 5),
-                    correct_attempts=random.randint(1, 4),
-                    average_score=score,
-                    is_weak_topic=is_weak,
-                    mastery_level="proficient" if score > 0.8 else "learning",
-                    last_attempt_at=datetime.utcnow() - timedelta(days=random.randint(1, 7))
-                )
-                db.add(performance)
+                # QuizAttempts - create 3-5 quiz attempts per week
+                num_attempts = random.randint(3, 5)
+                for attempt_idx in range(num_attempts):
+                    # Check if quiz attempt already exists
+                    is_correct = random.random() < profile["correct_ratio"]
+                    score_val = 1.0 if is_correct else 0.0
+                    
+                    quiz_attempt = QuizAttempt(
+                        student_id=user.id,
+                        course_id=course.id,
+                        week_number=week,
+                        question_type="mcq",
+                        question_data={"question": f"Sample question {attempt_idx + 1} for week {week}"},
+                        student_answer="Sample answer",
+                        score=score_val,
+                        max_score=1.0,
+                        is_correct=is_correct,
+                        feedback="Correct!" if is_correct else "Review this topic.",
+                        mode="practice",
+                        attempted_at=datetime.utcnow() - timedelta(
+                            days=random.randint(0, 5),
+                            hours=random.randint(0, 23),
+                            minutes=random.randint(0, 59)
+                        ),
+                        time_spent_seconds=random.randint(30, 180)
+                    )
+                    db.add(quiz_attempt)
     
     db.commit()
-    print("  Created sample performance data")
+    print("  Created distinct student performance profiles")
 
 
 def main():
