@@ -13,6 +13,7 @@ from app import models
 from app.api import deps
 from app.core.database import get_db
 from app.core import security
+from app.services.crawler.crawler_health import get_crawler_health_service
 
 router = APIRouter()
 
@@ -507,3 +508,56 @@ def assign_lecturer_to_course(
         "course_id": course_id,
         "lecturer_id": lecturer_id
     }
+
+
+# ==================== Crawler Health Endpoints ====================
+
+@router.get("/crawler/health")
+def get_crawler_health(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_super_admin),
+):
+    """
+    Get crawler health summary.
+    Shows overall health score, recent crawl stats, and per-crawler metrics.
+    Super admin only.
+    """
+    health_service = get_crawler_health_service(db)
+    return health_service.get_health_summary()
+
+
+@router.get("/crawler/logs")
+def get_crawler_logs(
+    crawler_type: Optional[str] = Query(None, description="Filter by crawler type"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_super_admin),
+):
+    """
+    Get recent crawler logs with optional filters.
+    Super admin only.
+    """
+    health_service = get_crawler_health_service(db)
+    return {
+        "logs": health_service.get_recent_logs(
+            crawler_type=crawler_type,
+            status=status,
+            limit=limit
+        )
+    }
+
+
+@router.get("/crawler/stats/{crawler_type}")
+def get_crawler_stats(
+    crawler_type: str,
+    days: int = Query(7, ge=1, le=30),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(deps.get_current_super_admin),
+):
+    """
+    Get detailed stats for a specific crawler.
+    Super admin only.
+    """
+    health_service = get_crawler_health_service(db)
+    return health_service.get_crawler_stats(crawler_type, days)
