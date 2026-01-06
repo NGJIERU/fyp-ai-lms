@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import TutorExplanation from "@/components/tutor/TutorExplanation";
 import RecommendationCard from "@/components/recommendations/RecommendationCard";
 import BundleCard from "@/components/recommendations/BundleCard";
+import RecommendationFilters, { SortOption, FilterOption } from "@/components/recommendations/RecommendationFilters";
 import { SmartFeedSkeleton } from "@/components/ui/Skeleton";
 import { useParams, useRouter } from "next/navigation";
 
@@ -140,6 +141,8 @@ export default function StudentCourseDetailPage() {
   const [ratingInFlight, setRatingInFlight] = useState<number | null>(null);
   const [likedRecs, setLikedRecs] = useState<Set<number>>(new Set());
   const [hiddenRecs, setHiddenRecs] = useState<Set<number>>(new Set());
+  const [sortBy, setSortBy] = useState<SortOption>("relevance");
+  const [filterBy, setFilterBy] = useState<FilterOption>("all");
 
   useEffect(() => {
     if (authLoading) return;
@@ -216,9 +219,36 @@ export default function StudentCourseDetailPage() {
     return ids;
   }, [bundles]);
 
-  // Filtered recommendations (exclude those in bundles)
+  // Filtered and sorted recommendations
   const filteredPersonalizedRecs = useMemo(() => {
-    return personalizedRecs.filter(r => !bundleMaterialIds.has(r.material.id));
+    let recs = personalizedRecs.filter(r => !bundleMaterialIds.has(r.material.id));
+    
+    // Apply source filter
+    if (filterBy !== "all") {
+      recs = recs.filter(r => {
+        const source = r.material.source.toLowerCase();
+        if (filterBy === "youtube") return source.includes("youtube");
+        if (filterBy === "arxiv") return source.includes("arxiv");
+        if (filterBy === "github") return source.includes("github");
+        if (filterBy === "manual") return source.includes("manual") || source.includes("upload");
+        return true;
+      });
+    }
+    
+    // Apply sorting
+    recs = [...recs].sort((a, b) => {
+      if (sortBy === "relevance") return b.personalized_score - a.personalized_score;
+      if (sortBy === "quality") return b.quality_score - a.quality_score;
+      if (sortBy === "recent") return b.material.id - a.material.id; // Higher ID = more recent
+      return 0;
+    });
+    
+    return recs;
+  }, [personalizedRecs, bundleMaterialIds, filterBy, sortBy]);
+  
+  // Total count before filtering (for display)
+  const totalRecsCount = useMemo(() => {
+    return personalizedRecs.filter(r => !bundleMaterialIds.has(r.material.id)).length;
   }, [personalizedRecs, bundleMaterialIds]);
 
   async function handleRateMaterial(materialId: number, score: number) {
@@ -529,6 +559,21 @@ export default function StudentCourseDetailPage() {
                 </div>
                 <p className="text-sm text-gray-500">Resources specifically chosen to improve your weak topics.</p>
               </header>
+              
+              {/* Sort and Filter Controls */}
+              {totalRecsCount > 0 && (
+                <div className="mt-4">
+                  <RecommendationFilters
+                    sortBy={sortBy}
+                    filterBy={filterBy}
+                    onSortChange={setSortBy}
+                    onFilterChange={setFilterBy}
+                    totalCount={totalRecsCount}
+                    filteredCount={filteredPersonalizedRecs.length}
+                  />
+                </div>
+              )}
+              
               <div className="mt-5 space-y-4">
                 {filteredPersonalizedRecs.length === 0 && (
                   <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 text-center">
