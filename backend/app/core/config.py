@@ -23,15 +23,15 @@ class Settings(BaseSettings):
     USE_OPENAI_TUTOR: bool = False
     USE_OPENAI_EMBEDDINGS: bool = False
     
-    # HuggingFace (primary)
+    # HuggingFace (primary - recommended)
     HUGGINGFACE_API_TOKEN: Optional[str] = None
-    HUGGINGFACE_MODEL: str = "HuggingFaceH4/zephyr-7b-beta"
-    USE_HUGGINGFACE_TUTOR: bool = False
+    HUGGINGFACE_MODEL: str = "Qwen/Qwen2.5-72B-Instruct"
+    USE_HUGGINGFACE_TUTOR: bool = True
 
-    # Google Gemini (New)
+    # Google Gemini (disabled by default - quota issues on free tier)
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-flash-latest"
-    USE_GEMINI_TUTOR: bool = True
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    USE_GEMINI_TUTOR: bool = False
     
     # General AI settings
     AI_TUTOR_MODEL: str = "gpt-3.5-turbo"  # Fallback/legacy

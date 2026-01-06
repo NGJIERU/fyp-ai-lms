@@ -56,25 +56,30 @@ class EmbeddingService:
         try:
             import torch
             from sentence_transformers import SentenceTransformer
-            # Force CPU device to avoid meta tensor issues
-            device = "cpu"
-            self.model = SentenceTransformer(self.model_name, device=device)
+            
+            # Don't specify device during init to avoid meta tensor issues
+            # Let the model decide its own device
+            self.model = SentenceTransformer(self.model_name)
             self.embedding_dim = self.model.get_sentence_embedding_dimension()
             logger.info(f"Loaded local embedding model: {self.model_name} ({self.embedding_dim} dims)")
         except ImportError:
             logger.error("sentence-transformers not installed. Run: pip install sentence-transformers")
             raise
-        except (OSError, Exception) as e:
+        except (OSError, NotImplementedError, Exception) as e:
             logger.warning(f"Failed to load model '{self.model_name}': {e}")
             logger.info("Falling back to default model: all-MiniLM-L6-v2")
             try:
                 self.model_name = "all-MiniLM-L6-v2"
-                self.model = SentenceTransformer(self.model_name, device="cpu")
+                # Don't specify device to avoid meta tensor issues
+                self.model = SentenceTransformer(self.model_name)
                 self.embedding_dim = self.model.get_sentence_embedding_dimension()
                 logger.info(f"Loaded fallback local embedding model: {self.model_name} ({self.embedding_dim} dims)")
             except Exception as fallback_error:
                 logger.error(f"Critical error: Failed to load fallback model: {fallback_error}")
-                raise e
+                # Create a dummy embedding service that returns zeros
+                self.model = None
+                self.embedding_dim = 384
+                logger.warning("Using dummy embeddings - RAG will not work properly")
         except Exception as e:
             logger.error(f"Error loading embedding model: {e}")
             raise
