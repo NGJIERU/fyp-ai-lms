@@ -19,83 +19,95 @@ interface Section {
 
 function parseContent(content: string): Section[] {
   const sections: Section[] = [];
-  
-  // Split by numbered sections (1. 2. 3. etc)
-  const sectionRegex = /(\d+\.\s+[^\n]+)/g;
-  const parts = content.split(sectionRegex);
+  const lines = content.split('\n');
   
   let currentSection: Section | null = null;
+  let contentBuffer: string[] = [];
   
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i].trim();
-    if (!part) continue;
+  // Helper to check if a line is a main section header
+  const isSectionHeader = (line: string): { isHeader: boolean; title: string } => {
+    const trimmed = line.trim();
     
-    // Check if this is a section header (starts with number)
-    if (/^\d+\.\s+/.test(part)) {
+    // Markdown headers: ### Title or ## Title
+    const mdMatch = trimmed.match(/^#{1,3}\s+(.+)$/);
+    if (mdMatch) {
+      return { isHeader: true, title: mdMatch[1].replace(/^#+\s*/, '') };
+    }
+    
+    // Numbered headers at start of line with short title (not a list item)
+    // e.g., "1. Introduction" but NOT "1. Listwise Deletion: Remove any row..."
+    const numMatch = trimmed.match(/^(\d+)\.\s+([A-Z][^:]{0,50})$/);
+    if (numMatch && !trimmed.includes(':') && trimmed.length < 60) {
+      return { isHeader: true, title: numMatch[2] };
+    }
+    
+    // Bold section headers: **Section Title**
+    const boldMatch = trimmed.match(/^\*\*([^*]+)\*\*:?\s*$/);
+    if (boldMatch && boldMatch[1].length < 50 && !boldMatch[1].includes('\n')) {
+      return { isHeader: true, title: boldMatch[1] };
+    }
+    
+    return { isHeader: false, title: '' };
+  };
+  
+  // Helper to flush content buffer to current section
+  const flushBuffer = () => {
+    if (currentSection && contentBuffer.length > 0) {
+      currentSection.content = contentBuffer.join('\n').trim();
+      contentBuffer = [];
+    }
+  };
+  
+  for (const line of lines) {
+    const headerCheck = isSectionHeader(line);
+    
+    if (headerCheck.isHeader) {
+      // Save previous section
+      flushBuffer();
       if (currentSection) {
         sections.push(currentSection);
       }
+      
+      // Start new section
       currentSection = {
-        title: part.replace(/^\d+\.\s+/, ""),
-        content: "",
+        title: headerCheck.title,
+        content: '',
         subsections: [],
       };
-    } else if (currentSection) {
-      // Parse subsections within content
-      const lines = part.split("\n");
-      let currentSubsection: { type: "simple" | "technical" | "example" | "other"; label: string; content: string } | null = null;
-      let buffer = "";
-      
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-        
-        if (trimmedLine.startsWith("**Simple Explanation") || trimmedLine.startsWith("Simple Explanation:")) {
-          if (currentSubsection) currentSection.subsections.push(currentSubsection);
-          if (buffer.trim()) currentSection.content += buffer;
-          buffer = "";
-          currentSubsection = { type: "simple", label: "Simple Explanation", content: "" };
-        } else if (trimmedLine.startsWith("**Technical Terms") || trimmedLine.startsWith("Technical Terms:")) {
-          if (currentSubsection) currentSection.subsections.push(currentSubsection);
-          if (buffer.trim()) currentSection.content += buffer;
-          buffer = "";
-          currentSubsection = { type: "technical", label: "Technical Terms", content: "" };
-        } else if (trimmedLine.startsWith("**Concrete Example") || trimmedLine.startsWith("Concrete Example:")) {
-          if (currentSubsection) currentSection.subsections.push(currentSubsection);
-          if (buffer.trim()) currentSection.content += buffer;
-          buffer = "";
-          currentSubsection = { type: "example", label: "Concrete Example", content: "" };
-        } else if (currentSubsection) {
-          currentSubsection.content += line + "\n";
-        } else {
-          buffer += line + "\n";
-        }
-      }
-      
-      if (currentSubsection) currentSection.subsections.push(currentSubsection);
-      if (buffer.trim()) currentSection.content = buffer;
     } else {
-      // Content before first numbered section
-      if (sections.length === 0 && part.trim()) {
-        sections.push({
-          title: "Introduction",
-          content: part,
-          subsections: [],
-        });
-      }
+      // Add to content buffer
+      contentBuffer.push(line);
     }
   }
   
+  // Don't forget last section
+  flushBuffer();
   if (currentSection) {
     sections.push(currentSection);
   }
   
-  // If no sections were parsed, return the whole content as one section
+  // If no sections found, treat intro + rest as sections
   if (sections.length === 0) {
-    sections.push({
-      title: "Explanation",
-      content: content,
-      subsections: [],
-    });
+    // Try to find a natural break point
+    const introEnd = content.indexOf('\n\n');
+    if (introEnd > 50 && introEnd < 500) {
+      sections.push({
+        title: 'Overview',
+        content: content.slice(0, introEnd).trim(),
+        subsections: [],
+      });
+      sections.push({
+        title: 'Details',
+        content: content.slice(introEnd).trim(),
+        subsections: [],
+      });
+    } else {
+      sections.push({
+        title: 'Explanation',
+        content: content,
+        subsections: [],
+      });
+    }
   }
   
   return sections;
