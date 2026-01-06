@@ -130,54 +130,9 @@ function renderFormattedText(text: string): React.ReactNode {
   return <>{elements}</>;
 }
 
-function renderInline(text: string): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  let remaining = text;
-  let key = 0;
-  
-  // Process inline formatting
-  while (remaining.length > 0) {
-    // Bold **text**
-    const boldMatch = remaining.match(/^(.*?)\*\*([^*]+)\*\*(.*)/);
-    if (boldMatch) {
-      if (boldMatch[1]) {
-        parts.push(<span key={`pre-bold-${key++}`}>{renderInlineCode(boldMatch[1], key)}</span>);
-      }
-      parts.push(<strong key={`bold-${key++}`} className="font-semibold text-gray-900">{boldMatch[2]}</strong>);
-      remaining = boldMatch[3];
-      continue;
-    }
-    
-    // No more bold, process rest for inline code
-    parts.push(<span key={`rest-${key++}`}>{renderInlineCode(remaining, key)}</span>);
-    break;
-  }
-  
-  return parts.length > 0 ? <span>{parts}</span> : <span>{text}</span>;
-}
-
-function renderInlineCode(text: string, baseKey: number): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  let remaining = text;
-  let key = 0;
-  
-  while (remaining.length > 0) {
-    const codeMatch = remaining.match(/^(.*?)`([^`]+)`(.*)/);
-    if (codeMatch) {
-      if (codeMatch[1]) parts.push(<span key={`t-${baseKey}-${key++}`}>{codeMatch[1]}</span>);
-      parts.push(
-        <code key={`c-${baseKey}-${key++}`} className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono text-xs">
-          {codeMatch[2]}
-        </code>
-      );
-      remaining = codeMatch[3];
-      continue;
-    }
-    
-    // No more inline code
-    if (remaining) parts.push(<span key={`r-${baseKey}-${key++}`}>{remaining}</span>);
-    break;
-  }
-  
-  return parts.length > 0 ? <span key={`ic-wrap-${baseKey}`}>{parts}</span> : <span key={`ic-text-${baseKey}`}>{text}</span>;
+// Simplified inline rendering - returns string or single element
+function renderInline(text: string): string {
+  // Just return the text - let CSS handle formatting
+  // Remove markdown bold markers for cleaner display
+  return text.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1');
 }
