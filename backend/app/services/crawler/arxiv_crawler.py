@@ -1,8 +1,9 @@
 """
 arXiv Crawler - Fetches academic paper metadata and abstracts
-Uses the arxiv Python library for API access
+Uses the arxiv Python library for API access (wrapped in async)
 """
 import logging
+import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -51,31 +52,40 @@ class ArxivCrawler(BaseCrawler):
         """
         Fetch arXiv papers matching the query.
         Prioritizes recent and highly-cited papers.
+        Uses asyncio.to_thread to wrap sync arxiv library calls.
         """
         try:
-            # Build search with educational focus
-            search_query = f"{query} AND (tutorial OR survey OR introduction OR review)"
-            
-            search = arxiv.Search(
-                query=search_query,
-                max_results=limit * 2,  # Fetch more to filter
-                sort_by=arxiv.SortCriterion.Relevance,
-                sort_order=arxiv.SortOrder.Descending
+            # Run sync arxiv API calls in thread pool
+            return await asyncio.to_thread(
+                self._fetch_sync, query, limit
             )
-            
-            results = []
-            for paper in self.client.results(search):
-                paper_data = self._extract_paper_data(paper)
-                if paper_data:
-                    results.append(paper_data)
-                    if len(results) >= limit:
-                        break
-            
-            return results
-            
         except Exception as e:
             logger.error(f"arXiv API error: {e}")
             return self._get_mock_data(query, limit)
+    
+    def _fetch_sync(self, query: str, limit: int) -> List[Dict[str, Any]]:
+        """
+        Synchronous fetch implementation (runs in thread pool).
+        """
+        # Build search with educational focus
+        search_query = f"{query} AND (tutorial OR survey OR introduction OR review)"
+        
+        search = arxiv.Search(
+            query=search_query,
+            max_results=limit * 2,  # Fetch more to filter
+            sort_by=arxiv.SortCriterion.Relevance,
+            sort_order=arxiv.SortOrder.Descending
+        )
+        
+        results = []
+        for paper in self.client.results(search):
+            paper_data = self._extract_paper_data(paper)
+            if paper_data:
+                results.append(paper_data)
+                if len(results) >= limit:
+                    break
+        
+        return results
     
     def _extract_paper_data(self, paper) -> Dict[str, Any]:
         """

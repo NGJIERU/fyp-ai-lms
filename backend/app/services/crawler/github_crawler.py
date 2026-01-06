@@ -1,9 +1,10 @@
 """
 GitHub Crawler - Fetches educational repository metadata
-Uses PyGithub library for GitHub API access
+Uses PyGithub library for GitHub API access (wrapped in async)
 """
 import os
 import logging
+import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -52,38 +53,44 @@ class GitHubCrawler(BaseCrawler):
         """
         Fetch GitHub repositories matching the query.
         Prioritizes educational and well-documented repos.
+        Uses asyncio.to_thread to wrap sync PyGithub calls.
         """
         try:
-            # Build search query with educational focus
-            search_query = f"{query} in:name,description,readme"
-            
-            # Search repositories
-            repos = self.github.search_repositories(
-                query=search_query,
-                sort="stars",
-                order="desc"
+            # Run sync GitHub API calls in thread pool
+            return await asyncio.to_thread(
+                self._fetch_sync, query, limit
             )
-            
-            results = []
-            for repo in repos[:limit * 2]:  # Fetch more to filter
-                try:
-                    repo_data = self._extract_repo_data(repo)
-                    if repo_data:
-                        results.append(repo_data)
-                        if len(results) >= limit:
-                            break
-                except GithubException as e:
-                    logger.debug(f"Error fetching repo {repo.full_name}: {e}")
-                    continue
-            
-            return results
-            
-        except GithubException as e:
+        except Exception as e:
             logger.error(f"GitHub API error: {e}")
             return self._get_mock_data(query, limit)
-        except Exception as e:
-            logger.error(f"Unexpected error in GitHub crawler: {e}")
-            return self._get_mock_data(query, limit)
+    
+    def _fetch_sync(self, query: str, limit: int) -> List[Dict[str, Any]]:
+        """
+        Synchronous fetch implementation (runs in thread pool).
+        """
+        # Build search query with educational focus
+        search_query = f"{query} in:name,description,readme"
+        
+        # Search repositories
+        repos = self.github.search_repositories(
+            query=search_query,
+            sort="stars",
+            order="desc"
+        )
+        
+        results = []
+        for repo in repos[:limit * 2]:  # Fetch more to filter
+            try:
+                repo_data = self._extract_repo_data(repo)
+                if repo_data:
+                    results.append(repo_data)
+                    if len(results) >= limit:
+                        break
+            except GithubException as e:
+                logger.debug(f"Error fetching repo {repo.full_name}: {e}")
+                continue
+        
+        return results
     
     def _extract_repo_data(self, repo) -> Optional[Dict[str, Any]]:
         """

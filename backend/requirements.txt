@@ -36,3 +36,4 @@ torch>=2.2.0
 
 # Optional: pgVector for PostgreSQL vector search
 # pgvector>=0.2.4
+aiohttp

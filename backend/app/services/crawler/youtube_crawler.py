@@ -9,9 +9,9 @@ from datetime import datetime
 import re
 
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
-import requests
 
 from app.services.crawler.base import BaseCrawler
+from app.services.crawler.async_http import get_async_http_client
 from app.models.material import Material
 
 logger = logging.getLogger(__name__)
@@ -49,14 +49,16 @@ class YouTubeCrawler(BaseCrawler):
     async def fetch(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Fetch YouTube videos matching the query.
-        Prioritizes educational content.
+        Prioritizes educational content. Uses async HTTP.
         """
         if not self.api_key:
             logger.warning("YouTube API key not configured. Using mock data.")
             return self._get_mock_data(query, limit)
         
         try:
-            # Search for videos
+            http_client = get_async_http_client()
+            
+            # Search for videos (async)
             search_url = f"{self.base_url}/search"
             params = {
                 "part": "snippet",
@@ -69,9 +71,7 @@ class YouTubeCrawler(BaseCrawler):
                 "key": self.api_key
             }
             
-            response = requests.get(search_url, params=params, timeout=30)
-            response.raise_for_status()
-            search_results = response.json()
+            search_results = await http_client.get(search_url, params=params)
             
             # Get video details for more metadata
             video_ids = [item["id"]["videoId"] for item in search_results.get("items", [])]
@@ -85,13 +85,11 @@ class YouTubeCrawler(BaseCrawler):
                 "key": self.api_key
             }
             
-            videos_response = requests.get(videos_url, params=videos_params, timeout=30)
-            videos_response.raise_for_status()
-            videos_data = videos_response.json()
+            videos_data = await http_client.get(videos_url, params=videos_params)
             
             return videos_data.get("items", [])[:limit]
             
-        except requests.RequestException as e:
+        except Exception as e:
             logger.error(f"YouTube API error: {e}")
             return self._get_mock_data(query, limit)
     
