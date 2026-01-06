@@ -353,7 +353,9 @@ def create_sample_performance(db: Session, users: dict):
                 ).first()
                 
                 if not existing_perf:
-                    score = random.uniform(*profile["score_range"])
+                    # Score stored as percentage (0-100), not decimal
+                    score_decimal = random.uniform(*profile["score_range"])
+                    score_pct = score_decimal * 100  # Convert to percentage
                     total_attempts = random.randint(*profile["attempts_range"])
                     correct_attempts = int(total_attempts * profile["correct_ratio"])
                     
@@ -363,8 +365,8 @@ def create_sample_performance(db: Session, users: dict):
                         week_number=week,
                         total_attempts=total_attempts,
                         correct_attempts=correct_attempts,
-                        average_score=score,
-                        is_weak_topic=score < 0.6,
+                        average_score=score_pct,  # Store as percentage (85, not 0.85)
+                        is_weak_topic=score_decimal < 0.6,
                         mastery_level=profile["mastery"],
                         last_attempt_at=datetime.utcnow() - timedelta(days=random.randint(1, 7))
                     )
