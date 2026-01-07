@@ -88,7 +88,6 @@ function MaterialsContent() {
           name: c.course_name,
         }));
         setCourses(options);
-        // Always set first course if no course selected
         if (options.length > 0) {
           setSelectedCourse((prev) => prev || initialCourseId || options[0].id);
         }
@@ -307,7 +306,6 @@ function MaterialsContent() {
     );
   }
   
-  // Show loading while auto-selecting first course
   if (!selectedCourse) {
     return (
       <div className="min-h-screen bg-gray-50 px-4 py-10">

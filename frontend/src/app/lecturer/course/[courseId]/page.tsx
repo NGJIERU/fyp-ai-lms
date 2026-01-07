@@ -26,7 +26,6 @@ type Submission = {
   attempted_at?: string | null;
 };
 
-// Helper function for relative time display
 function getRelativeTime(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -368,7 +367,6 @@ export default function LecturerCourseDetailPage() {
                 <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No analytics yet. Encourage students to submit quizzes.</p>
               )}
               {weekAnalytics.map((week) => {
-                // Color-code based on score
                 const scoreColor = week.avg_score >= 70 
                   ? "text-emerald-600" 
                   : week.avg_score >= 50 
@@ -379,7 +377,6 @@ export default function LecturerCourseDetailPage() {
                   : week.avg_score >= 50
                     ? "from-amber-400 to-amber-500"
                     : "from-red-400 to-red-500";
-                // Ensure minimum bar width for visibility
                 const barWidth = Math.max(week.avg_score, week.students_count > 0 ? 3 : 0);
                 
                 return (

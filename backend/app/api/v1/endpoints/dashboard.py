@@ -603,21 +603,11 @@ def get_lecturer_dashboard(
             .scalar()
         )
         
-        # FIX: Clamp score between 0 and 100. 
-        # Assuming database stores 0.0-1.0 ratio, multiply by 100. 
-        # If database stores 0-100, usage of min/max ensures safety.
         if avg_score_result is None:
             avg_score = 0.0
         else:
-            # If result is already > 1.0, it might be stored as percentage. 
-            # If < 1.0, it is ratio. 
-            # To be safe against "106%" issue:
-            # 1. Transform to ratio based on magnitude heuristic or standard (assuming ratio by default)
-            # 2. Clamp final percentage to 100.0
-            
             raw_val = float(avg_score_result)
             if raw_val > 1.0:
-                 # Likely already percentage or invalid high ratio
                  final_percent = raw_val
             else:
                  final_percent = raw_val * 100.0
@@ -655,8 +645,6 @@ def get_lecturer_dashboard(
             pending_approvals=pending
         ))
     
-    # Get recent submissions - aggregated by session (student + course + week + date)
-    # Group attempts that happened on the same day as one "session"
     recent_sessions = (
         db.query(
             models.QuizAttempt.student_id,
@@ -673,7 +661,7 @@ def get_lecturer_dashboard(
             models.QuizAttempt.student_id,
             models.QuizAttempt.course_id,
             models.QuizAttempt.week_number,
-            func.date(models.QuizAttempt.attempted_at),  # Group by date
+            func.date(models.QuizAttempt.attempted_at),
         )
         .order_by(desc(func.max(models.QuizAttempt.attempted_at)))
         .limit(10)
@@ -848,7 +836,6 @@ def get_course_students_performance(
             avg_score = 0.0
         else:
             raw_val = float(avg_score_result)
-            # Similar heuristic: if > 1.0 assume percentage, else ratio
             if raw_val > 1.0:
                 final_percent = raw_val
             else:
@@ -856,7 +843,6 @@ def get_course_students_performance(
             
             avg_score = min(max(final_percent, 0.0), 100.0)
         
-        # Get weak topics (Dynamic: Bottom 2 lowest scoring topics)
         weak_topics_query = (
             db.query(models.Syllabus.topic)
             .join(models.TopicPerformance, 
@@ -866,7 +852,7 @@ def get_course_students_performance(
                 models.TopicPerformance.student_id == student.id,
                 models.TopicPerformance.course_id == course_id,
                 models.Syllabus.is_active == True,
-                models.TopicPerformance.total_attempts > 0  # Only count topics they actually tried
+                models.TopicPerformance.total_attempts > 0
             )
             .order_by(models.TopicPerformance.average_score.asc())
             .limit(2)
@@ -875,8 +861,6 @@ def get_course_students_performance(
         
         weak_topic_names = [w[0] for w in weak_topics_query]
         
-        # Get last activity
-        # Priority: ActivityLog > QuizAttempt > TopicPerformance
         last_active_time = None
         
         last_log = (

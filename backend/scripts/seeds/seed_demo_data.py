@@ -304,8 +304,6 @@ def create_sample_performance(db: Session, users: dict):
     """Create sample quiz attempts and performance data with distinct student personas."""
     import random
     
-    # Define student personas with score ranges
-    # Alice = Excellent (85-98%), Bob = Normal (55-75%), Charlie = Struggling (25-45%)
     student_profiles = {
         "alice@student.lms.edu": {
             "type": "excellent",
@@ -343,9 +341,7 @@ def create_sample_performance(db: Session, users: dict):
         print(f"  Creating {profile['type']} student data for {user.full_name}...")
         
         for course in courses:
-            # Create performance for first 3 weeks
             for week in range(1, 4):
-                # TopicPerformance
                 existing_perf = db.query(TopicPerformance).filter(
                     TopicPerformance.student_id == user.id,
                     TopicPerformance.course_id == course.id,
@@ -353,9 +349,8 @@ def create_sample_performance(db: Session, users: dict):
                 ).first()
                 
                 if not existing_perf:
-                    # Score stored as percentage (0-100), not decimal
                     score_decimal = random.uniform(*profile["score_range"])
-                    score_pct = score_decimal * 100  # Convert to percentage
+                    score_pct = score_decimal * 100
                     total_attempts = random.randint(*profile["attempts_range"])
                     correct_attempts = int(total_attempts * profile["correct_ratio"])
                     
@@ -365,17 +360,15 @@ def create_sample_performance(db: Session, users: dict):
                         week_number=week,
                         total_attempts=total_attempts,
                         correct_attempts=correct_attempts,
-                        average_score=score_pct,  # Store as percentage (85, not 0.85)
+                        average_score=score_pct,
                         is_weak_topic=score_decimal < 0.6,
                         mastery_level=profile["mastery"],
                         last_attempt_at=datetime.utcnow() - timedelta(days=random.randint(1, 7))
                     )
                     db.add(performance)
                 
-                # QuizAttempts - create 3-5 quiz attempts per week
                 num_attempts = random.randint(3, 5)
                 for attempt_idx in range(num_attempts):
-                    # Check if quiz attempt already exists
                     is_correct = random.random() < profile["correct_ratio"]
                     score_val = 1.0 if is_correct else 0.0
                     

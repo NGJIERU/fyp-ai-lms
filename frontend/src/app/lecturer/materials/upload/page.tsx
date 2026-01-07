@@ -74,7 +74,6 @@ export default function UploadMaterialPage() {
                 body: JSON.stringify({ url: url.trim() }),
             });
 
-            // Auto-fill form fields with AI suggestions
             setTitle(result.title);
             setDescription(result.description);
             setType(result.type);

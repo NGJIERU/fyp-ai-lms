@@ -63,7 +63,6 @@ type LecturerDashboardResponse = {
   rating_insights: RatingInsightItem[];
 };
 
-// Helper function for relative time display
 function getRelativeTime(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
