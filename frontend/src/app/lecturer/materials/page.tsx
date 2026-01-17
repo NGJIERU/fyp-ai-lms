@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -63,11 +63,10 @@ function MaterialsContent() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [page, setPage] = useState(1);
   const [bulkLoading, setBulkLoading] = useState<"approve" | "reject" | null>(null);
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set());
 
-  const PAGE_SIZE = 10;
-
+  
   useEffect(() => {
     if (authLoading || !authorized) return;
 
@@ -120,7 +119,6 @@ function MaterialsContent() {
         });
         setPending(data);
         setSelectedIds(new Set());
-        setPage(1);
       } catch (err: any) {
         if (err.name === "AbortError") return;
         setError(err.message ?? "Failed to load pending materials");
@@ -192,12 +190,7 @@ function MaterialsContent() {
     }
   }
 
-  function handleFilterSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    setWeekFilter(formData.get("week")?.toString().trim() ?? "");
-  }
-
+  
   const sourceOptions = useMemo(() => {
     const set = new Set<string>();
     pending.forEach((item) => {
@@ -226,24 +219,40 @@ function MaterialsContent() {
     });
   }, [pending, sourceFilter, typeFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredPending.length / PAGE_SIZE));
+  
+  // Group items by week
+  const groupedByWeek = useMemo(() => {
+    const groups = new Map<number, PendingMaterial[]>();
+    filteredPending.forEach((item) => {
+      const week = item.week_number;
+      if (!groups.has(week)) {
+        groups.set(week, []);
+      }
+      groups.get(week)!.push(item);
+    });
+    // Sort by week number
+    return Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
+  }, [filteredPending]);
 
+  // Initialize all weeks as expanded when data loads
   useEffect(() => {
-    setPage(1);
-  }, [sourceFilter, typeFilter, weekFilter, selectedCourse]);
+    const weeks = new Set(filteredPending.map((item) => item.week_number));
+    setExpandedWeeks(weeks);
+  }, [selectedCourse]);
 
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+  function toggleWeek(week: number) {
+    setExpandedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(week)) {
+        next.delete(week);
+      } else {
+        next.add(week);
+      }
+      return next;
+    });
+  }
 
-  const paginatedPending = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredPending.slice(start, start + PAGE_SIZE);
-  }, [filteredPending, page]);
-
-  const allPageSelected = paginatedPending.every((item) => selectedIds.has(item.mapping_id)) && paginatedPending.length > 0;
+  const allPageSelected = filteredPending.every((item) => selectedIds.has(item.mapping_id)) && filteredPending.length > 0;
 
   function toggleSelect(mappingId: number) {
     setSelectedIds((prev) => {
@@ -260,7 +269,7 @@ function MaterialsContent() {
   function toggleSelectPage(value: boolean) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      paginatedPending.forEach((item) => {
+      filteredPending.forEach((item) => {
         if (value) {
           next.add(item.mapping_id);
         } else {
@@ -332,7 +341,7 @@ function MaterialsContent() {
         </header>
 
         <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <form className="flex flex-wrap gap-4" onSubmit={handleFilterSubmit}>
+          <div className="flex flex-wrap gap-4">
             <div className="flex flex-col">
               <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Course</label>
               <select
@@ -351,12 +360,12 @@ function MaterialsContent() {
               <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Week filter</label>
               <input
                 type="number"
-                name="week"
                 min={1}
                 max={14}
                 placeholder="Any week"
                 className="mt-1 w-32 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
-                defaultValue={weekFilter}
+                value={weekFilter}
+                onChange={(e) => setWeekFilter(e.target.value)}
               />
             </div>
             <div className="flex flex-col">
@@ -389,18 +398,10 @@ function MaterialsContent() {
                 ))}
               </select>
             </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
-              >
-                Apply filters
-              </button>
-            </div>
-            {actionMessage && (
+                        {actionMessage && (
               <div className="flex items-end text-sm text-emerald-600">{actionMessage}</div>
             )}
-          </form>
+          </div>
         </section>
 
         <section className="rounded-2xl bg-white p-6 shadow-sm">
@@ -409,26 +410,24 @@ function MaterialsContent() {
               <h2 className="text-lg font-semibold text-gray-900">Pending items</h2>
               <p className="text-sm text-gray-500">{selectedCourseLabel}</p>
               <p className="text-xs text-gray-400">
-                Showing {paginatedPending.length} of {filteredPending.length} items (page {page}/{totalPages})
+                {filteredPending.length} item{filteredPending.length !== 1 ? "s" : ""} pending
               </p>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full bg-green-500"></span>
+                  High ≥80%
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full bg-yellow-500"></span>
+                  Medium 60-79%
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full bg-red-500"></span>
+                  Low &lt;60%
+                </span>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={page === 1}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={page === totalPages}
-              >
-                Next
-              </button>
               {loadingPending && <p className="text-xs text-gray-400">Refreshing…</p>}
             </div>
           </div>
@@ -466,59 +465,91 @@ function MaterialsContent() {
               <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No materials match your filters.</p>
             )}
 
-            {paginatedPending.map((item) => {
-              const sourceLabel = item.material?.source || "Unknown";
-              const typeLabel = item.material?.type || "Unknown";
-              const isSelected = selectedIds.has(item.mapping_id);
+            {groupedByWeek.map(([weekNumber, items]) => {
+              const isExpanded = expandedWeeks.has(weekNumber);
               return (
-                <div key={item.mapping_id} className="rounded-xl border border-gray-100 p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(item.mapping_id)}
-                      />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          Week {item.week_number}: {item.material?.title ?? "Untitled resource"}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Source {sourceLabel} · Type {typeLabel}
-                        </p>
-                        <p className="text-xs text-gray-400">Relevance score {(item.relevance_score * 100).toFixed(0)}%</p>
-                      </div>
+                <div key={weekNumber} className="rounded-xl border border-gray-200 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleWeek(weekNumber)}
+                    className="w-full flex items-center justify-between bg-gray-50 px-4 py-3 text-left hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{isExpanded ? "▼" : "▶"}</span>
+                      <span className="font-semibold text-gray-900">Week {weekNumber}</span>
+                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                        {items.length} item{items.length !== 1 ? "s" : ""}
+                      </span>
                     </div>
-                    <a
-                      href={item.material?.url ?? "#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-                    >
-                      Open resource ↗
-                    </a>
-                  </div>
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="divide-y divide-gray-100">
+                      {items.map((item) => {
+                        const sourceLabel = item.material?.source || "Unknown";
+                        const typeLabel = item.material?.type || "Unknown";
+                        const isSelected = selectedIds.has(item.mapping_id);
+                        return (
+                          <div key={item.mapping_id} className="p-4 bg-white">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                  checked={isSelected}
+                                  onChange={() => toggleSelect(item.mapping_id)}
+                                />
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {item.material?.title ?? "Untitled resource"}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {sourceLabel} · {typeLabel}
+                                  </p>
+                                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    item.relevance_score >= 0.8
+                                      ? "bg-green-100 text-green-700"
+                                      : item.relevance_score >= 0.6
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : "bg-red-100 text-red-700"
+                                  }`}>
+                                    {item.relevance_score >= 0.8 ? "High" : item.relevance_score >= 0.6 ? "Medium" : "Low"} relevance
+                                  </span>
+                                </div>
+                              </div>
+                              <a
+                                href={item.material?.url ?? "#"}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                              >
+                                Open resource ↗
+                              </a>
+                            </div>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={isApproving === item.mapping_id}
-                      className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-60"
-                      onClick={() => handleApproval(item.mapping_id, true)}
-                    >
-                      {isApproving === item.mapping_id ? "Approving…" : "Approve"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isApproving === item.mapping_id}
-                      className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                      onClick={() => handleApproval(item.mapping_id, false)}
-                    >
-                      {isApproving === item.mapping_id ? "Processing…" : "Reject"}
-                    </button>
-                    <span className="text-xs text-gray-400">Material #{item.material_id} · Mapping #{item.mapping_id}</span>
-                  </div>
+                            <div className="mt-4 flex flex-wrap items-center gap-3">
+                              <button
+                                type="button"
+                                disabled={isApproving === item.mapping_id}
+                                className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-60"
+                                onClick={() => handleApproval(item.mapping_id, true)}
+                              >
+                                {isApproving === item.mapping_id ? "Approving…" : "Approve"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isApproving === item.mapping_id}
+                                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                onClick={() => handleApproval(item.mapping_id, false)}
+                              >
+                                {isApproving === item.mapping_id ? "Processing…" : "Reject"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
