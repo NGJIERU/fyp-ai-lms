@@ -11,6 +11,7 @@ type LecturerCourseStats = {
   course_code: string;
   course_name: string;
   enrolled_students: number;
+  at_risk_students: number;
   avg_class_score: number;
   materials_count: number;
   pending_approvals: number;
@@ -82,8 +83,7 @@ export default function LecturerDashboardPage() {
   const [data, setData] = useState<LecturerDashboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isCrawling, setIsCrawling] = useState(false);
-
+  
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) {
@@ -118,6 +118,10 @@ export default function LecturerDashboardPage() {
   }, [router]);
 
   const totalCourses = data?.courses.length ?? 0;
+  const totalAtRiskStudents = useMemo(() => {
+    if (!data || data.courses.length === 0) return 0;
+    return data.courses.reduce((sum, course) => sum + course.at_risk_students, 0);
+  }, [data]);
   const avgClassScore = useMemo(() => {
     if (!data || data.courses.length === 0) return 0;
     const total = data.courses.reduce((sum, course) => sum + course.avg_class_score, 0);
@@ -157,26 +161,6 @@ export default function LecturerDashboardPage() {
 
 
 
-  async function handleTriggerCrawl() {
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
-
-    setIsCrawling(true);
-    try {
-      await apiFetch("/api/v1/materials/crawl", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ crawler_type: "all", max_items: 5 }),
-      });
-      // Redirect to materials approval page
-      router.push("/lecturer/materials");
-    } catch (err: any) {
-      alert(err.message ?? "Failed to start crawler");
-    } finally {
-      setIsCrawling(false);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -198,30 +182,11 @@ export default function LecturerDashboardPage() {
           </p>
         </header>
         <div className="flex items-center justify-end gap-3 mb-4">
-          <button
-            onClick={handleTriggerCrawl}
-            disabled={isCrawling}
-            className={`flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all hover:shadow-lg hover:from-indigo-700 hover:to-violet-700 disabled:opacity-70 ${isCrawling ? "cursor-wait" : ""}`}
-          >
-            {isCrawling ? (
-              <>
-                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Scouting web...</span>
-              </>
-            ) : (
-              <>
-                <span>✨</span> Auto-Discover Materials
-              </>
-            )}
-          </button>
           <Link
             href="/lecturer/materials/upload"
-            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:text-indigo-600 hover:border-indigo-200"
+            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700"
           >
-            <span>+</span> Add Material manually
+            <span>+</span> Add Material
           </Link>
         </div>
         <section className="grid gap-4 md:grid-cols-4">
@@ -233,10 +198,11 @@ export default function LecturerDashboardPage() {
             tooltip="Count of active enrollments across all your courses (students may be counted multiple times)."
           />
           <SummaryCard
-            label="Avg class score"
-            value={`${avgClassScore.toFixed(0)}%`}
-            subtext="Normalized 0-100% across all topic attempts"
-            tooltip="Average of individual topic performance scores for all students."
+            label="Students needing help"
+            value={totalAtRiskStudents}
+            subtext="Scoring below 60%"
+            variant={totalAtRiskStudents > 0 ? "warning" : undefined}
+            tooltip="Students with average quiz scores below 60% who may need additional support."
           />
           <Link href="/lecturer/materials" className="block">
             <SummaryCard
@@ -419,6 +385,12 @@ function CourseRow({ course }: { course: LecturerCourseStats }) {
         <span>Class Avg Score</span>
         <span className="font-mono font-medium text-gray-900">{course.avg_class_score.toFixed(1)}%</span>
       </Link>
+      {course.at_risk_students > 0 && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600">
+          <span className="inline-block h-2 w-2 rounded-full bg-amber-500"></span>
+          {course.at_risk_students} student{course.at_risk_students !== 1 ? "s" : ""} need{course.at_risk_students === 1 ? "s" : ""} help
+        </div>
+      )}
     </div>
   );
 }

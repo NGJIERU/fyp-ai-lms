@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { apiFetch } from "@/lib/api";
@@ -322,7 +323,10 @@ function MaterialsContent() {
     <div className="min-h-screen bg-gray-50 px-4 py-10">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <header>
-          <p className="text-sm uppercase tracking-wide text-indigo-600">Materials approval</p>
+          <Link href="/lecturer/dashboard" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            ← Back to dashboard
+          </Link>
+          <p className="mt-4 text-sm uppercase tracking-wide text-indigo-600">Materials approval</p>
           <h1 className="mt-2 text-3xl font-semibold text-gray-900">Review pending recommendations</h1>
           <p className="mt-1 text-sm text-gray-500">Approve or reject AI-suggested content before students see it.</p>
         </header>

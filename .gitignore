@@ -11,3 +11,10 @@ venv/
 # Valid ignoring of FYP folders
 FYP 1 Slide/
 FYP 2 Slide/
+FYP 2 Second Slide/
+
+# Report and debug files
+*.txt
+debug_*
+Final_Year_Project_Report*
+backend/.env

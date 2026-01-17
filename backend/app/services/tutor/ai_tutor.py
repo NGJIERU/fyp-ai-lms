@@ -677,6 +677,7 @@ Response:"""
     ) -> Dict[str, Any]:
         """
         Detect weak topics for a student based on their performance.
+        Returns ALL practiced topics (not just weak ones) so users can see their progress.
         
         Args:
             db: Database session
@@ -684,27 +685,28 @@ Response:"""
             course_id: Course ID
             
         Returns:
-            List of weak topics with recommendations
+            List of all practiced topics with scores, plus recommendations for weak ones
         """
         from app.models.performance import TopicPerformance
         from app.models.syllabus import Syllabus
         from app.models.material import Material
         
-        # Find topics flagged as weak
-        weak_perfs = (
+        # Find ALL topics the student has practiced (not just weak ones)
+        all_perfs = (
             db.query(TopicPerformance)
             .filter(
                 TopicPerformance.student_id == student_id,
                 TopicPerformance.course_id == course_id,
-                TopicPerformance.is_weak_topic == True
+                TopicPerformance.total_attempts > 0
             )
+            .order_by(TopicPerformance.average_score.asc())
             .all()
         )
         
         results = []
         recommendations = set()
         
-        for perf in weak_perfs:
+        for perf in all_perfs:
             # Get topic name
             syllabus = (
                 db.query(Syllabus)
@@ -723,21 +725,26 @@ Response:"""
                 "attempts": perf.total_attempts
             })
             
-            # Find recommended materials for this weak topic via MaterialTopic
-            from app.models.material import MaterialTopic
-            material_topics = (
-                db.query(MaterialTopic)
-                .filter(
-                    MaterialTopic.course_id == course_id,
-                    MaterialTopic.week_number == perf.week_number,
-                    MaterialTopic.approved_by_lecturer == True
+            # Find recommended materials for weak topics (score < 70%)
+            if perf.average_score < 70:
+                from app.models.material import MaterialTopic
+                material_topics = (
+                    db.query(MaterialTopic)
+                    .filter(
+                        MaterialTopic.course_id == course_id,
+                        MaterialTopic.week_number == perf.week_number,
+                        MaterialTopic.approved_by_lecturer == True
+                    )
+                    .limit(2)
+                    .all()
                 )
-                .limit(2)
-                .all()
-            )
-            for mt in material_topics:
-                if mt.material:
-                    recommendations.add(mt.material.title)
+                for mt in material_topics:
+                    if mt.material:
+                        recommendations.add(mt.material.title)
+        
+        # If no MaterialTopic recommendations found, suggest general improvement
+        if results and not recommendations:
+            recommendations.add("Review course materials for topics with lower scores")
         
         return {
             "student_id": student_id,

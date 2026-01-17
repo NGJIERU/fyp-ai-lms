@@ -527,7 +527,7 @@ export default function StudentCourseDetailPage() {
             <div className="mt-6 space-y-4">
               {data.weekly_progress.map((week) => (
                 <WeekCard
-                  key={week.week_number}
+                  key={`${week.week_number}-${practiceResults[week.week_number] ? 'loaded' : 'empty'}`}
                   week={week}
                   practiceResult={practiceResults[week.week_number] ?? null}
                   tutorResponse={tutorResponses[week.week_number] ?? null}
@@ -733,7 +733,12 @@ function WeekCard({
 }) {
   const [mode, setMode] = useState<WeekCardMode>("overview");
 
-  useEffect(() => { if (practiceResult) setMode("practice"); }, [practiceResult]);
+  // Force switch to practice tab when results arrive, using a more robust check
+  useEffect(() => { 
+    if (practiceResult && practiceResult.questions && practiceResult.questions.length > 0) {
+      setMode("practice"); 
+    }
+  }, [practiceResult]);
   useEffect(() => { if (tutorResponse) setMode("tutor"); }, [tutorResponse]);
 
   const statusClass = STATUS_COLOR[week.status] ?? STATUS_COLOR.default;
@@ -800,7 +805,7 @@ function WeekCard({
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between rounded-lg bg-indigo-50 px-4 py-3 border border-indigo-100">
-                  <p className="text-sm font-semibold text-indigo-900">Practice set ({practiceResult.difficulty})</p>
+                  <p className="text-sm font-semibold text-indigo-900">Practice set</p>
                   <button onClick={onGenerateQuestions} disabled={isGenerating} className="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline transition">
                     {isGenerating ? "Refreshing..." : "Generate New Set ↻"}
                   </button>

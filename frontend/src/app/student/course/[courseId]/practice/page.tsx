@@ -9,9 +9,15 @@ import PracticeHistory from "@/components/dashboard/PracticeHistory";
 
 import QuizModal from "@/components/tutor/QuizModal";
 
-// Simple Chart Component (since we don't have recharts installed, using CSS bars)
-function WeakTopicsChart({ topics }: { topics: any[] }) {
-    if (!topics.length) return <p className="text-gray-500">No data available.</p>;
+// Topic Performance Chart - shows all practiced topics with color-coded scores
+function TopicPerformanceChart({ topics }: { topics: any[] }) {
+    if (!topics.length) return (
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="text-4xl mb-3">📝</div>
+            <p className="text-gray-500">No practice data yet.</p>
+            <p className="text-xs text-gray-400 mt-1">Complete a quiz to see your performance!</p>
+        </div>
+    );
 
     return (
         <div className="space-y-4">
@@ -19,14 +25,17 @@ function WeakTopicsChart({ topics }: { topics: any[] }) {
                 <div key={t.week_number} className="space-y-1">
                     <div className="flex justify-between text-sm">
                         <span className="font-medium text-gray-700">{t.topic}</span>
-                        <span className="text-gray-500">{t.score.toFixed(0)}%</span>
+                        <span className={`font-medium ${t.score >= 70 ? "text-green-600" : t.score >= 50 ? "text-yellow-600" : "text-red-600"}`}>
+                            {t.score.toFixed(0)}%
+                        </span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
                         <div
-                            className={`h-full rounded-full ${t.score < 60 ? "bg-red-500" : "bg-yellow-500"}`}
-                            style={{ width: `${t.score}%` }}
+                            className={`h-full rounded-full ${t.score >= 70 ? "bg-green-500" : t.score >= 50 ? "bg-yellow-500" : "bg-red-500"}`}
+                            style={{ width: `${Math.min(t.score, 100)}%` }}
                         />
                     </div>
+                    <p className="text-xs text-gray-400">{t.attempts} attempt{t.attempts !== 1 ? 's' : ''}</p>
                 </div>
             ))}
         </div>
@@ -78,9 +87,9 @@ export default function PracticeDashboardPage() {
 
                 <div className="grid gap-6 md:grid-cols-2">
                     <section className="rounded-2xl bg-white p-6 shadow-sm">
-                        <h2 className="mb-4 text-lg font-semibold text-gray-900">Weak Topics Analysis</h2>
+                        <h2 className="mb-4 text-lg font-semibold text-gray-900">Topic Performance</h2>
                         <div className="min-h-[200px]">
-                            {stats ? <WeakTopicsChart topics={stats.weak_topics} /> : <p>Loading...</p>}
+                            {stats ? <TopicPerformanceChart topics={stats.weak_topics} /> : <p>Loading...</p>}
                         </div>
                     </section>
 

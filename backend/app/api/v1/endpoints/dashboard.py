@@ -86,6 +86,7 @@ class LecturerCourseStats(BaseModel):
     course_code: str
     course_name: str
     enrolled_students: int
+    at_risk_students: int
     avg_class_score: float
     materials_count: int
     pending_approvals: int
@@ -614,6 +615,27 @@ def get_lecturer_dashboard(
             
             avg_score = min(max(final_percent, 0.0), 100.0)
         
+        # Count at-risk students (avg score < 60% with at least 1 attempt)
+        # Subquery to get each student's average score across all their topic performances
+        at_risk_subquery = (
+            db.query(
+                models.TopicPerformance.student_id,
+                func.avg(models.TopicPerformance.average_score).label('student_avg')
+            )
+            .join(models.StudentEnrollment, 
+                  (models.StudentEnrollment.student_id == models.TopicPerformance.student_id) &
+                  (models.StudentEnrollment.course_id == models.TopicPerformance.course_id))
+            .filter(
+                models.TopicPerformance.course_id == course.id,
+                models.TopicPerformance.total_attempts > 0,
+                models.StudentEnrollment.is_active == True
+            )
+            .group_by(models.TopicPerformance.student_id)
+            .having(func.avg(models.TopicPerformance.average_score) < 60)
+            .subquery()
+        )
+        at_risk_count = db.query(func.count()).select_from(at_risk_subquery).scalar() or 0
+        
         # Count materials
         materials_count = (
             db.query(models.MaterialTopic)
@@ -640,6 +662,7 @@ def get_lecturer_dashboard(
             course_code=course.code,
             course_name=course.name,
             enrolled_students=enrolled,
+            at_risk_students=at_risk_count,
             avg_class_score=round(avg_score, 1),
             materials_count=materials_count,
             pending_approvals=pending
@@ -941,17 +964,28 @@ def get_course_week_analytics(
     
     analytics = []
     
+    # Get currently enrolled student IDs for this course
+    enrolled_student_ids = (
+        db.query(models.StudentEnrollment.student_id)
+        .filter(
+            models.StudentEnrollment.course_id == course_id,
+            models.StudentEnrollment.is_active == True
+        )
+        .subquery()
+    )
+    
     for entry in syllabus_entries:
-        # Get aggregated stats for this week
+        # Get aggregated stats for this week (only for currently enrolled students)
         stats = (
             db.query(
                 func.avg(models.TopicPerformance.average_score).label('avg_score'),
                 func.sum(models.TopicPerformance.total_attempts).label('total_attempts'),
-                func.count(models.TopicPerformance.student_id).label('students_count')
+                func.count(func.distinct(models.TopicPerformance.student_id)).label('students_count')
             )
             .filter(
                 models.TopicPerformance.course_id == course_id,
-                models.TopicPerformance.week_number == entry.week_number
+                models.TopicPerformance.week_number == entry.week_number,
+                models.TopicPerformance.student_id.in_(enrolled_student_ids)
             )
             .first()
         )

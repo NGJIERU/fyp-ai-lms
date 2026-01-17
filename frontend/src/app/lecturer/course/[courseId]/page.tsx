@@ -314,6 +314,13 @@ export default function LecturerCourseDetailPage() {
                   Manage Students
                   <span className="text-indigo-600">→</span>
                 </Link>
+                <Link
+                  href={`/lecturer/course/${courseId}/syllabus`}
+                  className="flex items-center justify-between rounded-xl border border-gray-100 px-4 py-3 text-sm font-medium text-gray-700 hover:border-indigo-200"
+                >
+                  Manage Syllabus
+                  <span className="text-indigo-600">→</span>
+                </Link>
                 <button
                   type="button"
                   onClick={handleEmailAll}

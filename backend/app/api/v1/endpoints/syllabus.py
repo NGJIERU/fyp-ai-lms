@@ -77,7 +77,7 @@ def create_syllabus(
         )
     
     # Check if active record exists for (course_id, week_number)
-    existing_active = (
+    existing_week = (
         db.query(models.Syllabus)
         .filter(
             models.Syllabus.course_id == syllabus_in.course_id,
@@ -86,10 +86,26 @@ def create_syllabus(
         )
         .first()
     )
-    if existing_active:
+    if existing_week:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Active syllabus already exists for week {syllabus_in.week_number}. Use PUT to update."
+        )
+    
+    # Check if topic already exists in another week for this course
+    existing_topic = (
+        db.query(models.Syllabus)
+        .filter(
+            models.Syllabus.course_id == syllabus_in.course_id,
+            models.Syllabus.topic == syllabus_in.topic,
+            models.Syllabus.is_active == True
+        )
+        .first()
+    )
+    if existing_topic:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Topic '{syllabus_in.topic}' already exists in Week {existing_topic.week_number}. Please use a different topic name."
         )
     
     # Create new syllabus entry (version starts at 1)
@@ -257,6 +273,24 @@ def update_syllabus(
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Active syllabus already exists for week {syllabus_in.week_number}"
+                )
+    
+    # Validate topic if being updated - check for duplicates
+    if syllabus_in.topic is not None:
+        if syllabus_in.topic != existing_syllabus.topic:
+            existing_topic = (
+                db.query(models.Syllabus)
+                .filter(
+                    models.Syllabus.course_id == existing_syllabus.course_id,
+                    models.Syllabus.topic == syllabus_in.topic,
+                    models.Syllabus.is_active == True
+                )
+                .first()
+            )
+            if existing_topic:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Topic '{syllabus_in.topic}' already exists in Week {existing_topic.week_number}. Please use a different topic name."
                 )
     
     # Start transaction logic for versioning
