@@ -37,3 +37,8 @@ app.mount("/lecturer/materials", StaticFiles(directory="media/lecturer_materials
 @app.get("/")
 def root():
     return {"message": "Welcome to the AI-Powered LMS API"}
+
+
+@app.get("/api/v1/health")
+def health_check():
+    return {"status": "healthy"}
