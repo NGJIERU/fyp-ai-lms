@@ -31,7 +31,6 @@ EXPOSE 8000
 
 # Set environment variables
 ENV PYTHONPATH=/app
-ENV SQLALCHEMY_DATABASE_URI=sqlite:///./data/demo.db
 
 # Command to run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
