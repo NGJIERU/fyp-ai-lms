@@ -563,7 +563,8 @@ class RecommendationEngine:
         include_scores: bool = True,
     ) -> List[Dict[str, Any]]:
         """
-        Generate study bundles per week combining top recommendations with a short summary.
+        Generate study bundles per week using APPROVED materials only.
+        Shows lecturer-approved materials for each week's topic.
         """
         syllabus_entries = (
             db.query(Syllabus)
@@ -577,31 +578,43 @@ class RecommendationEngine:
 
         bundles: List[Dict[str, Any]] = []
         for entry in syllabus_entries:
-            recs = self.recommend_for_topic(
-                db=db,
-                course_id=course_id,
-                week_number=entry.week_number,
-                top_k=materials_per_bundle,
-                exclude_approved=False
+            # Get APPROVED materials for this week from MaterialTopic
+            approved_mappings = (
+                db.query(MaterialTopic)
+                .filter(
+                    MaterialTopic.course_id == course_id,
+                    MaterialTopic.week_number == entry.week_number,
+                    MaterialTopic.approved_by_lecturer == True
+                )
+                .order_by(MaterialTopic.relevance_score.desc())
+                .limit(materials_per_bundle)
+                .all()
             )
-            if not recs:
+            
+            if not approved_mappings:
                 continue
 
-            summary = self._build_bundle_summary(entry.topic, recs)
+            # Build bundle from approved materials
             bundle_materials = []
-            for rec in recs:
-                material_data = {
-                    "id": rec["material"]["id"],
-                    "title": rec["material"]["title"],
-                    "url": rec["material"]["url"],
-                    "source": rec["material"]["source"],
-                    "type": rec["material"]["type"],
-                }
-                if include_scores:
-                    material_data["similarity_score"] = rec["similarity_score"]
-                    material_data["quality_score"] = rec["quality_score"]
-                bundle_materials.append(material_data)
+            for mapping in approved_mappings:
+                if mapping.material:
+                    material_data = {
+                        "id": mapping.material.id,
+                        "title": mapping.material.title,
+                        "url": mapping.material.url,
+                        "source": mapping.material.source,
+                        "type": mapping.material.type,
+                    }
+                    if include_scores:
+                        material_data["similarity_score"] = mapping.relevance_score
+                        material_data["quality_score"] = mapping.material.quality_score
+                    bundle_materials.append(material_data)
 
+            if not bundle_materials:
+                continue
+
+            summary = self._build_bundle_summary(entry.topic, [{"material": {"title": m["title"]}} for m in bundle_materials])
+            
             bundles.append(
                 {
                     "course_id": course_id,

@@ -77,7 +77,7 @@ export default function BundleCard({
   materials,
   onMaterialClick,
 }: BundleCardProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Count materials by type
   const typeCounts = materials.reduce((acc, m) => {

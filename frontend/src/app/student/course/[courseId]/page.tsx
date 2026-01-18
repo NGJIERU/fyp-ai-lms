@@ -192,7 +192,7 @@ export default function StudentCourseDetailPage() {
           { headers: { Authorization: `Bearer ${token}` } }
         ),
         apiFetch<{ bundles: ContextBundle[] }>(
-          `/api/v1/recommendations/context-bundles?course_id=${courseId}`,
+          `/api/v1/recommendations/context-bundles?course_id=${courseId}&max_bundles=14`,
           { headers: { Authorization: `Bearer ${token}` } }
         ),
       ]);
@@ -300,6 +300,9 @@ export default function StudentCourseDetailPage() {
     }
   }
 
+  // Track which materials have been viewed in this session to avoid double-counting
+  const [viewedMaterialIds, setViewedMaterialIds] = useState<Set<number>>(new Set());
+
   function handleMaterialClick(materialId: number, resourceType: string = "material") {
     const token = localStorage.getItem("access_token");
     if (!token || !data) return;
@@ -317,6 +320,15 @@ export default function StudentCourseDetailPage() {
         course_id: data.course_id,
       }),
       keepalive: true,
+    }).then(() => {
+      // Update materials_accessed count in real-time (only if not already viewed)
+      if (!viewedMaterialIds.has(materialId)) {
+        setViewedMaterialIds(prev => new Set(prev).add(materialId));
+        setData(prev => prev ? {
+          ...prev,
+          materials_accessed: Math.min(prev.materials_accessed + 1, prev.total_materials)
+        } : prev);
+      }
     }).catch(() => { });
   }
 
@@ -507,9 +519,9 @@ export default function StudentCourseDetailPage() {
               }`}
           >
             Smart Feed
-            {(filteredPersonalizedRecs.length > 0 || data.weak_topics.length > 0) && (
+            {filteredPersonalizedRecs.length > 0 && (
               <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">
-                {filteredPersonalizedRecs.length + data.weak_topics.length}
+                {filteredPersonalizedRecs.length}
               </span>
             )}
           </button>
@@ -640,45 +652,6 @@ export default function StudentCourseDetailPage() {
                 </div>
               </section>
             )}
-            <section className="rounded-2xl bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Weak topics & recommended materials</h2>
-                  <p className="text-sm text-gray-500">Use curated resources to close gaps quickly.</p>
-                </div>
-              </div>
-              <div className="mt-6 space-y-4">
-                {data.weak_topics.length === 0 && (
-                  <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">Great work! No weak topics flagged right now.</p>
-                )}
-                {data.weak_topics.map((topic) => (
-                  <div key={topic.week_number} className="rounded-xl border border-gray-100 p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          Week {topic.week_number}: {topic.topic}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Avg score {(topic.average_score * 100).toFixed(0)}% · {topic.attempts} attempts
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">Needs review</span>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                      {topic.recommended_materials.map((material) => (
-                        <a key={material.id} href={material.url} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 hover:border-indigo-200" onClick={() => handleMaterialClick(material.id)}>
-                          <span>
-                            <span className="font-medium text-gray-900">{material.title}</span>
-                            <span className="ml-2 text-xs uppercase text-gray-400">{material.source}</span>
-                          </span>
-                          <span className="text-xs text-gray-500">Quality {(material.quality_score * 100).toFixed(0)}%</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
           </div>
         )}
       </div>
@@ -751,9 +724,6 @@ function WeekCard({
             <p className="text-sm font-medium text-gray-900">Week {week.week_number}</p>
             <p className="text-xs text-gray-500">{week.topic}</p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusClass}`}>
-            {formatStatusLabel(week.status)}
-          </span>
         </div>
       </div>
       <div className="flex border-b border-gray-100 bg-gray-50/50 px-4">
