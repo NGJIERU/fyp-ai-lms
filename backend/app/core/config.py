@@ -48,7 +48,12 @@ class Settings(BaseSettings):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if not self.SQLALCHEMY_DATABASE_URI:
+        # Check for DATABASE_URL first (Fly.io/Heroku style)
+        import os
+        database_url = os.getenv("DATABASE_URL")
+        if database_url:
+            self.SQLALCHEMY_DATABASE_URI = database_url
+        elif not self.SQLALCHEMY_DATABASE_URI:
             self.SQLALCHEMY_DATABASE_URI = f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
 
 settings = Settings()
