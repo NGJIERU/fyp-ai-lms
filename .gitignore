@@ -18,3 +18,5 @@ FYP 2 Second Slide/
 debug_*
 Final_Year_Project_Report*
 backend/.env
+backend/.env.backup
+*.env.backup
