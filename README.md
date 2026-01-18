@@ -90,6 +90,30 @@ The system follows a **Modular Monolith** architecture:
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
+## 🛠️ Commands Reference
+
+### Local Development
+
+| Action | Command |
+|--------|---------|
+| **Start Backend** | `cd backend && source venv/bin/activate && uvicorn app.main:app --reload --port 8000` |
+| **Start Frontend** | `cd frontend && npm run dev` |
+| **Seed Database** | `cd backend && python scripts/seeds/setup_demo.py` |
+
+### Production (Fly.io)
+
+| Action | Command |
+|--------|---------|
+| **Start Backend** | `fly scale count 1 --app fyp-ai-lms-backend` |
+| **Stop Backend** | `fly scale count 0 --app fyp-ai-lms-backend` |
+| **View Logs** | `fly logs --app fyp-ai-lms-backend --no-tail` |
+| **SSH into Server** | `fly ssh console --app fyp-ai-lms-backend` |
+| **Deploy Changes** | `cd backend && fly deploy` |
+
+> **Note:** Frontend on Vercel auto-deploys on `git push`. Fly.io backend needs manual start/stop to save costs.
+
+---
+
 ## 🤝 Contributing
 
 Please read [GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md) before submitting a Pull Request.
