@@ -19,7 +19,13 @@ from app.models import (
 def create_demo_users(db: Session):
     """Create demo users for each role."""
     users = [
-        # Super Admin
+        # Super Admins
+        {
+            "email": "admin@uni.edu",
+            "password": "admin123",
+            "full_name": "Super Admin",
+            "role": UserRole.SUPER_ADMIN
+        },
         {
             "email": "admin@lms.edu",
             "password": "admin123",
@@ -28,32 +34,38 @@ def create_demo_users(db: Session):
         },
         # Lecturers
         {
-            "email": "dr.smith@lms.edu",
+            "email": "smith@lms.edu",
             "password": "lecturer123",
-            "full_name": "Dr. John Smith",
+            "full_name": "Dr. Smith",
             "role": UserRole.LECTURER
         },
         {
-            "email": "dr.chen@lms.edu",
+            "email": "chen@lms.edu",
             "password": "lecturer123",
-            "full_name": "Dr. Emily Chen",
+            "full_name": "Dr. Chen",
+            "role": UserRole.LECTURER
+        },
+        {
+            "email": "lee@lms.edu",
+            "password": "lecturer123",
+            "full_name": "Dr. Lee",
             "role": UserRole.LECTURER
         },
         # Students
         {
-            "email": "alice@student.lms.edu",
+            "email": "alice@lms.edu",
             "password": "student123",
             "full_name": "Alice Johnson",
             "role": UserRole.STUDENT
         },
         {
-            "email": "bob@student.lms.edu",
+            "email": "bob@lms.edu",
             "password": "student123",
             "full_name": "Bob Williams",
             "role": UserRole.STUDENT
         },
         {
-            "email": "charlie@student.lms.edu",
+            "email": "charlie@lms.edu",
             "password": "student123",
             "full_name": "Charlie Brown",
             "role": UserRole.STUDENT
@@ -305,21 +317,21 @@ def create_sample_performance(db: Session, users: dict):
     import random
     
     student_profiles = {
-        "alice@student.lms.edu": {
+        "alice@lms.edu": {
             "type": "excellent",
             "score_range": (0.85, 0.98),
             "correct_ratio": 0.9,
             "mastery": "proficient",
             "attempts_range": (3, 5),
         },
-        "bob@student.lms.edu": {
+        "bob@lms.edu": {
             "type": "normal", 
             "score_range": (0.55, 0.75),
             "correct_ratio": 0.6,
             "mastery": "learning",
             "attempts_range": (2, 4),
         },
-        "charlie@student.lms.edu": {
+        "charlie@lms.edu": {
             "type": "struggling",
             "score_range": (0.25, 0.45),
             "correct_ratio": 0.3,
@@ -428,8 +440,8 @@ def main():
         print("\n📋 Demo Credentials:")
         print("-" * 40)
         print("Super Admin:  admin@lms.edu / admin123")
-        print("Lecturer:     dr.smith@lms.edu / lecturer123")
-        print("Student:      alice@student.lms.edu / student123")
+        print("Lecturer:     smith@lms.edu / lecturer123")
+        print("Student:      alice@lms.edu / student123")
         print("-" * 40)
         
     except Exception as e:

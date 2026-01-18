@@ -49,8 +49,8 @@ def main():
         print("\n✨ Demo Setup Complete!")
         print("--------------------------------")
         print("Credentials:")
-        print("Student: alice@student.lms.edu / student123")
-        print("Lecturer: dr.smith@lms.edu / lecturer123")
+        print("Student: alice@lms.edu / student123")
+        print("Lecturer: smith@lms.edu / lecturer123")
         print("Admin: admin@lms.edu / admin123")
         
     except Exception as e:
