@@ -3,10 +3,12 @@ YouTube Crawler - Fetches educational video metadata and transcripts
 Uses YouTube Data API v3 and youtube-transcript-api for transcripts
 """
 import os
+import json
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import re
+from pathlib import Path
 
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
 
@@ -21,35 +23,52 @@ class YouTubeCrawler(BaseCrawler):
     """
     Crawler for YouTube educational videos.
     Fetches video metadata and transcripts for educational content.
+    Uses curated channel lists for higher quality results.
     """
-    
-    # Educational channels whitelist (domain authority)
-    EDUCATIONAL_CHANNELS = {
-        "MIT OpenCourseWare": 1.0,
-        "Stanford": 0.95,
-        "3Blue1Brown": 0.9,
-        "Sentdex": 0.85,
-        "Corey Schafer": 0.85,
-        "freeCodeCamp.org": 0.9,
-        "CS Dojo": 0.8,
-        "Tech With Tim": 0.8,
-        "Traversy Media": 0.85,
-        "The Coding Train": 0.85,
-        "StatQuest with Josh Starmer": 0.9,
-        "Two Minute Papers": 0.85,
-        "Computerphile": 0.9,
-        "Numberphile": 0.85,
-    }
     
     def __init__(self, api_key: Optional[str] = None):
         super().__init__("YouTube")
         self.api_key = api_key or os.getenv("YOUTUBE_API_KEY")
         self.base_url = "https://www.googleapis.com/youtube/v3"
+        self.curated_channels = self._load_curated_channels()
     
-    async def fetch(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def _load_curated_channels(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Load curated channels from config file."""
+        config_path = Path(__file__).parent.parent.parent / "config" / "curated_channels.json"
+        try:
+            with open(config_path, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load curated channels config: {e}")
+            return {}
+    
+    def get_channel_ids_for_subject(self, subject: str) -> List[str]:
+        """
+        Get curated channel IDs for a subject.
+        Maps common subject names to config keys.
+        """
+        subject_lower = subject.lower()
+        
+        # Map subject keywords to config keys
+        if any(kw in subject_lower for kw in ["data", "statistic", "machine learning", "ml", "pandas", "numpy"]):
+            channels = self.curated_channels.get("data_science", [])
+        elif any(kw in subject_lower for kw in ["ai", "artificial", "neural", "deep learning", "llm", "nlp"]):
+            channels = self.curated_channels.get("artificial_intelligence", [])
+        elif any(kw in subject_lower for kw in ["software", "programming", "web", "backend", "frontend", "algorithm"]):
+            channels = self.curated_channels.get("software_engineering", [])
+        else:
+            # Combine all channels for unknown subjects
+            channels = []
+            for ch_list in self.curated_channels.values():
+                channels.extend(ch_list)
+        
+        return [ch["channel_id"] for ch in channels if "channel_id" in ch]
+    
+    async def fetch(self, query: str, limit: int = 10, subject: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Fetch YouTube videos matching the query.
-        Prioritizes educational content. Uses async HTTP.
+        If subject is provided, searches within curated channels for that subject.
+        Otherwise falls back to general YouTube search.
         """
         if not self.api_key:
             logger.warning("YouTube API key not configured. Using mock data.")
@@ -57,31 +76,61 @@ class YouTubeCrawler(BaseCrawler):
         
         try:
             http_client = get_async_http_client()
+            all_videos = []
             
-            # Search for videos (async)
-            search_url = f"{self.base_url}/search"
-            params = {
-                "part": "snippet",
-                "q": f"{query} tutorial education",
-                "type": "video",
-                "maxResults": min(limit * 2, 50),  # Fetch more to filter
-                "relevanceLanguage": "en",
-                "videoDuration": "medium",  # 4-20 minutes
-                "videoDefinition": "high",
-                "key": self.api_key
-            }
+            # Get curated channel IDs for the subject
+            channel_ids = self.get_channel_ids_for_subject(subject) if subject else []
             
-            search_results = await http_client.get(search_url, params=params)
+            if channel_ids:
+                # Search within each curated channel (up to 5 channels to limit API calls)
+                for channel_id in channel_ids[:5]:
+                    if len(all_videos) >= limit * 2:
+                        break
+                    
+                    search_url = f"{self.base_url}/search"
+                    params = {
+                        "part": "snippet",
+                        "q": query,
+                        "type": "video",
+                        "channelId": channel_id,  # Search within this channel
+                        "maxResults": min(limit, 10),
+                        "relevanceLanguage": "en",
+                        "key": self.api_key
+                    }
+                    
+                    try:
+                        search_results = await http_client.get(search_url, params=params)
+                        items = search_results.get("items", [])
+                        all_videos.extend(items)
+                    except Exception as e:
+                        logger.debug(f"Error searching channel {channel_id}: {e}")
+                        continue
+            
+            # If no curated results, fall back to general search
+            if not all_videos:
+                search_url = f"{self.base_url}/search"
+                params = {
+                    "part": "snippet",
+                    "q": f"{query} tutorial education",
+                    "type": "video",
+                    "maxResults": min(limit * 2, 50),
+                    "relevanceLanguage": "en",
+                    "videoDuration": "medium",
+                    "videoDefinition": "high",
+                    "key": self.api_key
+                }
+                search_results = await http_client.get(search_url, params=params)
+                all_videos = search_results.get("items", [])
             
             # Get video details for more metadata
-            video_ids = [item["id"]["videoId"] for item in search_results.get("items", [])]
+            video_ids = [item["id"]["videoId"] for item in all_videos if item.get("id", {}).get("videoId")]
             if not video_ids:
                 return []
             
             videos_url = f"{self.base_url}/videos"
             videos_params = {
                 "part": "snippet,statistics,contentDetails",
-                "id": ",".join(video_ids),
+                "id": ",".join(video_ids[:limit * 2]),
                 "key": self.api_key
             }
             
@@ -209,10 +258,12 @@ class YouTubeCrawler(BaseCrawler):
         score = 0.0
         
         # Domain authority (educational channel bonus)
-        for channel, authority in self.EDUCATIONAL_CHANNELS.items():
-            if channel.lower() in channel_title.lower():
-                score += authority * 0.3
-                break
+        curated_channel_names = []
+        for ch_list in self.curated_channels.values():
+            curated_channel_names.extend([ch.get("channel_name", "").lower() for ch in ch_list])
+        
+        if any(name in channel_title.lower() for name in curated_channel_names if name):
+            score += 0.3  # Curated channel bonus
         else:
             score += 0.1  # Base score for unknown channels
         

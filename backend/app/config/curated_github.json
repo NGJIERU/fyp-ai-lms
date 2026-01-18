@@ -1,0 +1,188 @@
+{
+  "data_science": [
+    {
+      "repo": "microsoft/Data-Science-For-Beginners",
+      "url": "https://github.com/microsoft/Data-Science-For-Beginners",
+      "why": "10-week curriculum with quizzes and assignments",
+      "type": "curriculum"
+    },
+    {
+      "repo": "jakevdp/PythonDataScienceHandbook",
+      "url": "https://github.com/jakevdp/PythonDataScienceHandbook",
+      "why": "Classic book covering NumPy, Pandas, Matplotlib, Scikit-Learn",
+      "type": "notebooks"
+    },
+    {
+      "repo": "DataTalksClub/machine-learning-zoomcamp",
+      "url": "https://github.com/DataTalksClub/machine-learning-zoomcamp",
+      "why": "Free bootcamp covering ML engineering lifecycle",
+      "type": "bootcamp"
+    },
+    {
+      "repo": "fastai/fastbook",
+      "url": "https://github.com/fastai/fastbook",
+      "why": "Top-down teaching approach for deep learning",
+      "type": "notebooks"
+    },
+    {
+      "repo": "scikit-learn/scikit-learn",
+      "url": "https://github.com/scikit-learn/scikit-learn",
+      "why": "Examples folder demonstrates every ML algorithm",
+      "type": "examples"
+    },
+    {
+      "repo": "pytorch/tutorials",
+      "url": "https://github.com/pytorch/tutorials",
+      "why": "Official PyTorch tutorials from basics to advanced",
+      "type": "tutorials"
+    },
+    {
+      "repo": "academic/awesome-datascience",
+      "url": "https://github.com/academic/awesome-datascience",
+      "why": "Meta-resource indexing hundreds of DS resources",
+      "type": "curated_list"
+    },
+    {
+      "repo": "donnemartin/data-science-ipython-notebooks",
+      "url": "https://github.com/donnemartin/data-science-ipython-notebooks",
+      "why": "Collection covering big data to deep learning",
+      "type": "notebooks"
+    },
+    {
+      "repo": "huggingface/transformers",
+      "url": "https://github.com/huggingface/transformers",
+      "why": "Best way to learn LLM implementation and fine-tuning",
+      "type": "examples"
+    },
+    {
+      "repo": "josephmisiti/awesome-machine-learning",
+      "url": "https://github.com/josephmisiti/awesome-machine-learning",
+      "why": "ML libraries across all programming languages",
+      "type": "curated_list"
+    }
+  ],
+  "artificial_intelligence": [
+    {
+      "repo": "microsoft/generative-ai-for-beginners",
+      "url": "https://github.com/microsoft/generative-ai-for-beginners",
+      "why": "21-lesson curriculum for building GenAI apps",
+      "type": "curriculum"
+    },
+    {
+      "repo": "microsoft/AI-For-Beginners",
+      "url": "https://github.com/microsoft/AI-For-Beginners",
+      "why": "Foundations of Symbolic and Neural AI",
+      "type": "curriculum"
+    },
+    {
+      "repo": "fastai/fastbook",
+      "url": "https://github.com/fastai/fastbook",
+      "why": "Top-down deep learning approach",
+      "type": "notebooks"
+    },
+    {
+      "repo": "d2l-ai/d2l-en",
+      "url": "https://github.com/d2l-ai/d2l-en",
+      "why": "Academically rigorous interactive textbook",
+      "type": "notebooks"
+    },
+    {
+      "repo": "karpathy/nanoGPT",
+      "url": "https://github.com/karpathy/nanoGPT",
+      "why": "Simplest, cleanest GPT implementation",
+      "type": "implementation"
+    },
+    {
+      "repo": "openai/openai-cookbook",
+      "url": "https://github.com/openai/openai-cookbook",
+      "why": "RAG, embeddings, fine-tuning patterns",
+      "type": "recipes"
+    },
+    {
+      "repo": "GokuMohandas/Made-With-ML",
+      "url": "https://github.com/GokuMohandas/Made-With-ML",
+      "why": "MLOps - notebook to production",
+      "type": "tutorials"
+    },
+    {
+      "repo": "huggingface/transformers",
+      "url": "https://github.com/huggingface/transformers",
+      "why": "State-of-the-art model training examples",
+      "type": "examples"
+    },
+    {
+      "repo": "langchain-ai/langchain",
+      "url": "https://github.com/langchain-ai/langchain",
+      "why": "Standard framework for AI agents",
+      "type": "framework"
+    },
+    {
+      "repo": "pytorch/tutorials",
+      "url": "https://github.com/pytorch/tutorials",
+      "why": "Official PyTorch tutorials",
+      "type": "tutorials"
+    }
+  ],
+  "software_engineering": [
+    {
+      "repo": "kamranahmedse/developer-roadmap",
+      "url": "https://github.com/kamranahmedse/developer-roadmap",
+      "why": "Visual maps for every engineering track",
+      "type": "roadmaps"
+    },
+    {
+      "repo": "donnemartin/system-design-primer",
+      "url": "https://github.com/donnemartin/system-design-primer",
+      "why": "Gold standard for scalable system design",
+      "type": "documentation"
+    },
+    {
+      "repo": "jwasham/coding-interview-university",
+      "url": "https://github.com/jwasham/coding-interview-university",
+      "why": "Complete CS study plan",
+      "type": "study_plan"
+    },
+    {
+      "repo": "ossu/computer-science",
+      "url": "https://github.com/ossu/computer-science",
+      "why": "Free self-paced CS degree curriculum",
+      "type": "curriculum"
+    },
+    {
+      "repo": "codecrafters-io/build-your-own-x",
+      "url": "https://github.com/codecrafters-io/build-your-own-x",
+      "why": "Learn by recreating technologies from scratch",
+      "type": "tutorials"
+    },
+    {
+      "repo": "freeCodeCamp/freeCodeCamp",
+      "url": "https://github.com/freeCodeCamp/freeCodeCamp",
+      "why": "Full stack web development curriculum",
+      "type": "curriculum"
+    },
+    {
+      "repo": "yangshun/tech-interview-handbook",
+      "url": "https://github.com/yangshun/tech-interview-handbook",
+      "why": "Interview prep with behavioral and algorithmic patterns",
+      "type": "guide"
+    },
+    {
+      "repo": "practical-tutorials/project-based-learning",
+      "url": "https://github.com/practical-tutorials/project-based-learning",
+      "why": "Learn by building real applications",
+      "type": "tutorials"
+    },
+    {
+      "repo": "TheAlgorithms/Python",
+      "url": "https://github.com/TheAlgorithms/Python",
+      "why": "Clean implementations of all major algorithms",
+      "type": "implementations"
+    },
+    {
+      "repo": "ryanmcdermott/clean-code-javascript",
+      "url": "https://github.com/ryanmcdermott/clean-code-javascript",
+      "why": "Clean Code principles for JavaScript",
+      "type": "style_guide"
+    }
+  ]
+}

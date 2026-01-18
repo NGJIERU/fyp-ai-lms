@@ -48,11 +48,16 @@ class ArxivCrawler(BaseCrawler):
         super().__init__("arXiv")
         self.client = arxiv.Client()
     
-    async def fetch(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def fetch(self, query: str, limit: int = 10, subject: str = None) -> List[Dict[str, Any]]:
         """
         Fetch arXiv papers matching the query.
         Prioritizes recent and highly-cited papers.
         Uses asyncio.to_thread to wrap sync arxiv library calls.
+        
+        Args:
+            query: Search query
+            limit: Max results
+            subject: Optional subject (not used for arXiv, but accepted for API consistency)
         """
         try:
             # Run sync arxiv API calls in thread pool

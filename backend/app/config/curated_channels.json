@@ -1,0 +1,188 @@
+{
+  "data_science": [
+    {
+      "channel_name": "StatQuest with Josh Starmer",
+      "channel_id": "UCtYLUTtgS3k1Fg4y5tAhLbw",
+      "why_recommended": "Breaks down complex statistics and machine learning concepts into bite-sized, easy-to-understand pieces.",
+      "content_style": "Visual explanations, animations, conceptual lectures"
+    },
+    {
+      "channel_name": "3Blue1Brown",
+      "channel_id": "UCYO_jab_esuFRV4b17AJtAw",
+      "why_recommended": "Offers the best visual intuition for the mathematics underpinning data science, specifically Linear Algebra and Neural Networks.",
+      "content_style": "High-quality animations, mathematical visualizations"
+    },
+    {
+      "channel_name": "DeepLearningAI",
+      "channel_id": "UCcIXc5mJsHVYTZR1maL5l9w",
+      "why_recommended": "Founded by Andrew Ng, provides academic-grade content and lectures.",
+      "content_style": "Academic lectures, course excerpts, expert interviews"
+    },
+    {
+      "channel_name": "Sentdex",
+      "channel_id": "UCfzlCWGWYyIQ0aLC5w48gBQ",
+      "why_recommended": "Comprehensive 'from scratch' coding tutorials for neural networks and ML models.",
+      "content_style": "Live coding, extensive tutorials, project-based learning"
+    },
+    {
+      "channel_name": "Krish Naik",
+      "channel_id": "UCNU_lfiiWBdtULKOw6X0Dig",
+      "why_recommended": "Covers the entire data science lifecycle, from statistics to deployment (MLOps).",
+      "content_style": "Tutorials, whiteboard explanations, end-to-end projects"
+    },
+    {
+      "channel_name": "Ken Jee",
+      "channel_id": "UCiT9RITQ9PW6BhXK0y2jaeg",
+      "why_recommended": "Focuses on the career and project management side of data science.",
+      "content_style": "Career guidance, project reviews, podcast interviews"
+    },
+    {
+      "channel_name": "Corey Schafer",
+      "channel_id": "UCCezIgC97PvUuR4_gbFUs5g",
+      "why_recommended": "Python tutorials widely considered the best on YouTube, covering Pandas, OOP, and environment setup.",
+      "content_style": "In-depth coding walk-throughs, best practice guides"
+    },
+    {
+      "channel_name": "Two Minute Papers",
+      "channel_id": "UCbfYPyITQ-7l4upoX8nvctg",
+      "why_recommended": "Keeps you updated with the bleeding edge of AI and graphics research.",
+      "content_style": "Research paper summaries, visual demonstrations"
+    },
+    {
+      "channel_name": "Data School",
+      "channel_id": "UCnVzApLJE2ljPZSeQylSEyg",
+      "why_recommended": "Perfect for beginners to intermediate learners, focusing on pandas and scikit-learn.",
+      "content_style": "Concise tutorials, Q&A sessions, library deep-dives"
+    },
+    {
+      "channel_name": "codebasics",
+      "channel_id": "UCh9nVJoWXmFb7sLApWGcLPQ",
+      "why_recommended": "Bridges the gap between theory and industry application with tools like PowerBI, SQL.",
+      "content_style": "Project-based learning, industry tool tutorials"
+    }
+  ],
+  "software_engineering": [
+    {
+      "channel_name": "Computerphile",
+      "channel_id": "UC9-y-6csu5WGm29I7JiwpnA",
+      "why_recommended": "Academic yet accessible dives into fundamental theories of computer science.",
+      "content_style": "Academic discussions, whiteboard sessions"
+    },
+    {
+      "channel_name": "ByteByteGo",
+      "channel_id": "UCZgt6AzoyjslHTC9dz0UoTw",
+      "why_recommended": "The gold standard for System Design, breaking down large-scale architectures.",
+      "content_style": "High-quality animations, system design diagrams"
+    },
+    {
+      "channel_name": "Continuous Delivery",
+      "channel_id": "UCCfqyGl3nq_V0bo64CjZh8g",
+      "why_recommended": "Covers CI/CD, Test Driven Development, and DevOps culture.",
+      "content_style": "Professional advice, methodology lectures"
+    },
+    {
+      "channel_name": "Hussein Nasser",
+      "channel_id": "UC_ML5xP23TOWKUcc-oAE_Eg",
+      "why_recommended": "Specializes in backend engineering with detailed explanations of databases and networking.",
+      "content_style": "Deep-dive lectures, protocol analysis, whiteboarding"
+    },
+    {
+      "channel_name": "ArjanCodes",
+      "channel_id": "UCVhQ2NnY5Rskt6UjCUkJ_DA",
+      "why_recommended": "Focuses on Software Design and Architecture patterns, SOLID principles.",
+      "content_style": "Code refactoring sessions, design pattern tutorials"
+    },
+    {
+      "channel_name": "NeetCode",
+      "channel_id": "UC_mYaQAE6-71rjSN6CeCA-g",
+      "why_recommended": "Definitive resource for Data Structures and Algorithms with visual explanations.",
+      "content_style": "Visual algorithm walkthroughs, coding solutions"
+    },
+    {
+      "channel_name": "GOTO Conferences",
+      "channel_id": "UCs_tLP3AiwYKwdUHpltJPuA",
+      "why_recommended": "Full-length conference talks from leading software experts.",
+      "content_style": "Conference keynotes, expert panels"
+    },
+    {
+      "channel_name": "CS50",
+      "channel_id": "UCcabW7890RKJzL968QWEykA",
+      "why_recommended": "Harvard's Introduction to Computer Science, the highest quality CS course online.",
+      "content_style": "University lectures, polished educational productions"
+    },
+    {
+      "channel_name": "freeCodeCamp.org",
+      "channel_id": "UC8butISFwT-Wl7EV0hUK0BQ",
+      "why_recommended": "Massive library of full-length courses covering almost every technology.",
+      "content_style": "Full-length courses, hands-on tutorials"
+    },
+    {
+      "channel_name": "Amigoscode",
+      "channel_id": "UC2KfmYEM4KCuA1ZurravgYw",
+      "why_recommended": "Covers enterprise-grade software engineering with Java, Spring Boot, and Microservices.",
+      "content_style": "Live coding, enterprise application tutorials"
+    }
+  ],
+  "artificial_intelligence": [
+    {
+      "channel_name": "Andrej Karpathy",
+      "channel_id": "UCXUPKJO5MZQN11PqgIvyuvQ",
+      "why_recommended": "Gold standard for learning how LLMs and Neural Networks work from the ground up.",
+      "content_style": "Deep-dive coding lectures, 'from scratch' implementations"
+    },
+    {
+      "channel_name": "Robert Miles AI Safety",
+      "channel_id": "UCLB7AzTwc6VFZrBsO2ucBMg",
+      "why_recommended": "Most important channel for understanding AI Alignment and Safety.",
+      "content_style": "Video essays, research paper analysis"
+    },
+    {
+      "channel_name": "Yannic Kilcher",
+      "channel_id": "UCZHmQk67mSJgfCCTn7xBfew",
+      "why_recommended": "Essential for keeping up with AI research papers with line-by-line explanations.",
+      "content_style": "Research paper reviews, code reviews"
+    },
+    {
+      "channel_name": "AI Explained",
+      "channel_id": "UCNJ1Ymd5yFuUPtn21xtRbbw",
+      "why_recommended": "High-signal analysis of AI developments referencing technical reports and benchmarks.",
+      "content_style": "News analysis, technical report breakdowns"
+    },
+    {
+      "channel_name": "Stanford Online",
+      "channel_id": "UCBa5G_ESCn8Yd4vw5U-gIcg",
+      "why_recommended": "Full semester-long courses including CS229 (Machine Learning) and CS224N (NLP).",
+      "content_style": "Full university course lectures"
+    },
+    {
+      "channel_name": "Google DeepMind",
+      "channel_id": "UCP7jMXSY2xbc3KCAE0MHQ-A",
+      "why_recommended": "Official channel with breakthrough research visualizations like AlphaFold.",
+      "content_style": "Research documentaries, visual explainers"
+    },
+    {
+      "channel_name": "Hugging Face",
+      "channel_id": "UCHlNU7kIZhRgSbhHvFoy72w",
+      "why_recommended": "Hub of the open-source AI community with practical Transformers tutorials.",
+      "content_style": "Coding tutorials, library walkthroughs"
+    },
+    {
+      "channel_name": "Jeremy Howard",
+      "channel_id": "UCX7Y2qWriXpqocG97SFW2OQ",
+      "why_recommended": "Co-founder of fast.ai with 'Practical Deep Learning for Coders' courses.",
+      "content_style": "Full course lectures, live coding"
+    },
+    {
+      "channel_name": "AssemblyAI",
+      "channel_id": "UCtatfZMf-8EkIwASXM4ts0A",
+      "why_recommended": "Clear, visually engaging tutorials on Diffusion Models, GANs, and Transformers.",
+      "content_style": "Visual tutorials, concept explainers"
+    },
+    {
+      "channel_name": "Two Minute Papers",
+      "channel_id": "UCbfYPyITQ-7l4upoX8nvctg",
+      "why_recommended": "Best channel for visual showcases of AI research results.",
+      "content_style": "Short research summaries, visual demos"
+    }
+  ]
+}

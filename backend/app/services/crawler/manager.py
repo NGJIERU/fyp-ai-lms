@@ -30,9 +30,15 @@ class CrawlerManager:
         # Lookup with lowercase for case-insensitive matching
         return self.crawlers.get(source_name.lower())
 
-    async def run_crawler(self, source_name: str, query: str, limit: int = 10):
+    async def run_crawler(self, source_name: str, query: str, limit: int = 10, subject: str = None):
         """
         Run a specific crawler by source name.
+        
+        Args:
+            source_name: Name of the crawler (youtube, github, etc.)
+            query: Search query
+            limit: Max items to fetch
+            subject: Course subject for curated source matching (e.g., "Data Science")
         """
         crawler = self.get_crawler(source_name)
         if not crawler:
@@ -50,10 +56,13 @@ class CrawlerManager:
         db.refresh(log_entry)
 
         try:
-            logger.info(f"Starting crawl for {source_name} with query '{query}'")
+            logger.info(f"Starting crawl for {source_name} with query '{query}' (subject: {subject})")
             
-            # 1. Fetch
-            raw_items = await crawler.fetch(query, limit)
+            # 1. Fetch - pass subject for curated source matching
+            if subject:
+                raw_items = await crawler.fetch(query, limit, subject=subject)
+            else:
+                raw_items = await crawler.fetch(query, limit)
             
             items_saved = 0
             seen_urls = set()  # Track URLs within this batch
@@ -181,3 +190,55 @@ class CrawlerManager:
                     )
         
         return mappings_created
+    
+    async def crawl_for_course(self, course_id: int, limit_per_topic: int = 5):
+        """
+        Crawl materials for a specific course based on its syllabus topics.
+        Uses the course name/description as subject for curated source matching.
+        
+        Args:
+            course_id: Course ID to crawl materials for
+            limit_per_topic: Max items per topic per crawler
+        """
+        db = self.db_session_factory()
+        try:
+            # Get course info for subject matching
+            course = db.query(Course).filter(Course.id == course_id).first()
+            if not course:
+                logger.error(f"Course {course_id} not found")
+                return
+            
+            # Use course name as subject for curated matching
+            subject = course.name
+            logger.info(f"Starting crawl for course: {subject} (ID: {course_id})")
+            
+            # Get syllabus topics for this course
+            syllabuses = (
+                db.query(Syllabus)
+                .filter(Syllabus.course_id == course_id, Syllabus.is_active == True)
+                .order_by(Syllabus.week_number)
+                .all()
+            )
+            
+            if not syllabuses:
+                logger.warning(f"No syllabus found for course {course_id}")
+                return
+            
+            # Crawl for each topic
+            for syllabus in syllabuses:
+                query = syllabus.topic
+                logger.info(f"Crawling for Week {syllabus.week_number}: {query}")
+                
+                # Run all registered crawlers for this topic
+                for source_name in self.crawlers:
+                    await self.run_crawler(
+                        source_name=source_name,
+                        query=query,
+                        limit=limit_per_topic,
+                        subject=subject
+                    )
+            
+            logger.info(f"Completed crawling for course {course_id}")
+            
+        finally:
+            db.close()

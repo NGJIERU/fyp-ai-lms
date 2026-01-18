@@ -1,0 +1,240 @@
+{
+  "general": [
+    {
+      "name": "MIT OpenCourseWare",
+      "url": "https://ocw.mit.edu",
+      "search_url": "https://ocw.mit.edu/search/?q=",
+      "quality_score": 0.95,
+      "content_type": "courses",
+      "subjects": ["computer science", "engineering", "mathematics", "physics"]
+    },
+    {
+      "name": "Khan Academy",
+      "url": "https://www.khanacademy.org",
+      "search_url": "https://www.khanacademy.org/search?search_again=1&page_search_query=",
+      "quality_score": 0.90,
+      "content_type": "lectures",
+      "subjects": ["mathematics", "calculus", "statistics", "economics"]
+    },
+    {
+      "name": "OpenStax",
+      "url": "https://openstax.org",
+      "search_url": "https://openstax.org/subjects",
+      "quality_score": 0.90,
+      "content_type": "textbooks",
+      "subjects": ["physics", "calculus", "statistics", "biology"]
+    },
+    {
+      "name": "Coursera (Audit)",
+      "url": "https://www.coursera.org",
+      "search_url": "https://www.coursera.org/search?query=",
+      "quality_score": 0.85,
+      "content_type": "courses",
+      "subjects": ["data science", "business", "computer science"]
+    },
+    {
+      "name": "edX (Audit)",
+      "url": "https://www.edx.org",
+      "search_url": "https://www.edx.org/search?q=",
+      "quality_score": 0.85,
+      "content_type": "courses",
+      "subjects": ["computer science", "humanities", "engineering"]
+    },
+    {
+      "name": "Open Yale Courses",
+      "url": "https://oyc.yale.edu",
+      "search_url": "https://oyc.yale.edu/courses",
+      "quality_score": 0.90,
+      "content_type": "lectures",
+      "subjects": ["history", "philosophy", "psychology", "literature"]
+    },
+    {
+      "name": "Carnegie Mellon OLI",
+      "url": "https://oli.cmu.edu",
+      "search_url": "https://oli.cmu.edu/courses/",
+      "quality_score": 0.90,
+      "content_type": "interactive",
+      "subjects": ["logic", "statistics", "programming"]
+    },
+    {
+      "name": "Saylor Academy",
+      "url": "https://www.saylor.org",
+      "search_url": "https://learn.saylor.org/course/search.php?search=",
+      "quality_score": 0.80,
+      "content_type": "courses",
+      "subjects": ["business", "computer science", "political science"]
+    },
+    {
+      "name": "Open Textbook Library",
+      "url": "https://open.umn.edu/opentextbooks",
+      "search_url": "https://open.umn.edu/opentextbooks/subjects",
+      "quality_score": 0.85,
+      "content_type": "textbooks",
+      "subjects": ["business", "computer science", "education", "law"]
+    },
+    {
+      "name": "LibreTexts",
+      "url": "https://libretexts.org",
+      "search_url": "https://libretexts.org/",
+      "quality_score": 0.80,
+      "content_type": "textbooks",
+      "subjects": ["chemistry", "biology", "mathematics", "medicine"]
+    }
+  ],
+  "computer_science": [
+    {
+      "name": "University of Helsinki MOOC.fi",
+      "url": "https://www.mooc.fi/en",
+      "search_url": "https://www.mooc.fi/en/#courses",
+      "quality_score": 0.95,
+      "content_type": "interactive",
+      "subjects": ["java", "web development", "devops", "cyber security"]
+    },
+    {
+      "name": "Stanford Online",
+      "url": "https://online.stanford.edu/free-content",
+      "search_url": "https://online.stanford.edu/search-catalog",
+      "quality_score": 0.95,
+      "content_type": "courses",
+      "subjects": ["machine learning", "algorithms", "databases"]
+    },
+    {
+      "name": "Harvard CS50",
+      "url": "https://cs50.harvard.edu",
+      "search_url": "https://cs50.harvard.edu/x/",
+      "quality_score": 0.95,
+      "content_type": "courses",
+      "subjects": ["computer science fundamentals", "web programming", "python"]
+    },
+    {
+      "name": "NPTEL",
+      "url": "https://nptel.ac.in",
+      "search_url": "https://nptel.ac.in/courses",
+      "quality_score": 0.85,
+      "content_type": "lectures",
+      "subjects": ["computer architecture", "data structures", "theoretical cs"]
+    },
+    {
+      "name": "FreeCodeCamp",
+      "url": "https://www.freecodecamp.org",
+      "search_url": "https://www.freecodecamp.org/learn",
+      "quality_score": 0.85,
+      "content_type": "interactive",
+      "subjects": ["web design", "algorithms", "data visualization"]
+    },
+    {
+      "name": "Google Tech Dev Guide",
+      "url": "https://techdevguide.withgoogle.com",
+      "search_url": "https://techdevguide.withgoogle.com/paths/",
+      "quality_score": 0.90,
+      "content_type": "tutorials",
+      "subjects": ["algorithms", "distributed systems", "interview prep"]
+    },
+    {
+      "name": "Udacity (Free Courses)",
+      "url": "https://www.udacity.com/courses/all",
+      "search_url": "https://www.udacity.com/courses/all?search=",
+      "quality_score": 0.80,
+      "content_type": "courses",
+      "subjects": ["ai intro", "version control", "android development"]
+    }
+  ],
+  "data_science_ai": [
+    {
+      "name": "Kaggle Learn",
+      "url": "https://www.kaggle.com/learn",
+      "search_url": "https://www.kaggle.com/learn",
+      "quality_score": 0.95,
+      "content_type": "interactive",
+      "subjects": ["python", "pandas", "machine learning", "deep learning"]
+    },
+    {
+      "name": "Fast.ai",
+      "url": "https://www.fast.ai",
+      "search_url": "https://course.fast.ai/",
+      "quality_score": 0.95,
+      "content_type": "courses",
+      "subjects": ["deep learning", "nlp", "stable diffusion"]
+    },
+    {
+      "name": "Hugging Face Learn",
+      "url": "https://huggingface.co/learn",
+      "search_url": "https://huggingface.co/learn",
+      "quality_score": 0.95,
+      "content_type": "courses",
+      "subjects": ["nlp", "transformers", "llm", "audio processing"]
+    },
+    {
+      "name": "Google AI Education",
+      "url": "https://ai.google/education",
+      "search_url": "https://developers.google.com/machine-learning",
+      "quality_score": 0.90,
+      "content_type": "courses",
+      "subjects": ["machine learning", "tensorflow", "generative ai"]
+    },
+    {
+      "name": "Elements of AI",
+      "url": "https://www.elementsofai.com",
+      "search_url": "https://www.elementsofai.com/",
+      "quality_score": 0.85,
+      "content_type": "courses",
+      "subjects": ["ai ethics", "ai philosophy", "neural networks basics"]
+    },
+    {
+      "name": "Papers with Code",
+      "url": "https://paperswithcode.com",
+      "search_url": "https://paperswithcode.com/search?q=",
+      "quality_score": 0.90,
+      "content_type": "papers",
+      "subjects": ["state of the art models", "computer vision", "nlp"]
+    },
+    {
+      "name": "DeepLearning.AI",
+      "url": "https://www.deeplearning.ai",
+      "search_url": "https://www.deeplearning.ai/courses/",
+      "quality_score": 0.95,
+      "content_type": "courses",
+      "subjects": ["neural networks", "mlops", "tensorflow", "generative ai"]
+    },
+    {
+      "name": "Amazon MLU",
+      "url": "https://aws.amazon.com/machine-learning/mlu",
+      "search_url": "https://aws.amazon.com/machine-learning/mlu/",
+      "quality_score": 0.85,
+      "content_type": "courses",
+      "subjects": ["nlp", "computer vision", "tabular data"]
+    },
+    {
+      "name": "IBM Cognitive Class",
+      "url": "https://cognitiveclass.ai",
+      "search_url": "https://cognitiveclass.ai/courses",
+      "quality_score": 0.80,
+      "content_type": "courses",
+      "subjects": ["data science", "sql", "big data", "blockchain"]
+    },
+    {
+      "name": "OpenAI Spinning Up",
+      "url": "https://spinningup.openai.com",
+      "search_url": "https://spinningup.openai.com/en/latest/",
+      "quality_score": 0.90,
+      "content_type": "documentation",
+      "subjects": ["reinforcement learning", "deep rl", "ppo"]
+    },
+    {
+      "name": "UC Berkeley Data 8",
+      "url": "http://data8.org",
+      "search_url": "http://data8.org/",
+      "quality_score": 0.90,
+      "content_type": "courses",
+      "subjects": ["data science foundations", "probability", "python"]
+    },
+    {
+      "name": "Full Stack Deep Learning",
+      "url": "https://fullstackdeeplearning.com",
+      "search_url": "https://fullstackdeeplearning.com/course/",
+      "quality_score": 0.90,
+      "content_type": "courses",
+      "subjects": ["mlops", "model deployment", "testing ml systems"]
+    }
+  ]
+}

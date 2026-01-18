@@ -1,10 +1,12 @@
-"""
-OER (Open Educational Resources) Crawler
+"""OER (Open Educational Resources) Crawler
 Fetches content from MIT OCW, NPTEL, and other open educational platforms
+Uses curated OER sources for higher quality results.
 """
+import json
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from pathlib import Path
 import re
 
 import requests
@@ -75,13 +77,61 @@ class OERCrawler(BaseCrawler):
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Educational Bot; +https://example.edu/bot)"
         })
+        self.curated_sources = self._load_curated_sources()
     
-    async def fetch(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def _load_curated_sources(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Load curated OER sources from config file."""
+        config_path = Path(__file__).parent.parent.parent / "config" / "curated_oer.json"
+        try:
+            with open(config_path, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load curated OER config: {e}")
+            return {}
+    
+    def get_sources_for_subject(self, subject: str) -> List[Dict[str, Any]]:
+        """
+        Get curated OER sources for a subject.
+        Returns list of source configs with URLs and quality scores.
+        """
+        subject_lower = subject.lower()
+        sources = []
+        
+        # Always include general sources
+        sources.extend(self.curated_sources.get("general", []))
+        
+        # Add subject-specific sources
+        if any(kw in subject_lower for kw in ["data", "machine learning", "ml", "ai", "deep learning", "neural"]):
+            sources.extend(self.curated_sources.get("data_science_ai", []))
+        
+        if any(kw in subject_lower for kw in ["programming", "software", "web", "algorithm", "computer"]):
+            sources.extend(self.curated_sources.get("computer_science", []))
+        
+        # Remove duplicates by URL
+        seen_urls = set()
+        unique_sources = []
+        for src in sources:
+            if src.get("url") not in seen_urls:
+                seen_urls.add(src.get("url"))
+                unique_sources.append(src)
+        
+        # Sort by quality score
+        return sorted(unique_sources, key=lambda x: x.get("quality_score", 0), reverse=True)
+    
+    async def fetch(self, query: str, limit: int = 10, subject: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Fetch OER content matching the query.
+        If subject is provided, returns curated source recommendations.
         Uses web scraping with respect for robots.txt.
         """
         try:
+            # If subject provided, return curated source recommendations
+            if subject:
+                curated = self._get_curated_recommendations(query, subject, limit)
+                if curated:
+                    return curated
+            
+            # Fall back to specific source fetching
             if self.source_name == "MIT OCW":
                 return await self._fetch_mit_ocw(query, limit)
             elif self.source_name == "NPTEL":
@@ -92,6 +142,40 @@ class OERCrawler(BaseCrawler):
         except Exception as e:
             logger.error(f"OER fetch error: {e}")
             return self._get_mock_data(query, limit)
+    
+    def _get_curated_recommendations(self, query: str, subject: str, limit: int) -> List[Dict[str, Any]]:
+        """
+        Get curated OER recommendations based on subject.
+        Returns source info with direct links for the user.
+        """
+        sources = self.get_sources_for_subject(subject)
+        query_lower = query.lower()
+        
+        results = []
+        for src in sources[:limit]:
+            # Check if any of the source's subjects match the query
+            src_subjects = src.get("subjects", [])
+            relevance = 0.5  # Base relevance
+            
+            for subj in src_subjects:
+                if any(word in subj.lower() for word in query_lower.split()):
+                    relevance = 0.9
+                    break
+            
+            results.append({
+                "title": f"{src['name']} - {query}",
+                "url": src.get("search_url", src["url"]),
+                "description": f"Search for '{query}' on {src['name']}. Content type: {src.get('content_type', 'courses')}",
+                "source": src["name"],
+                "source_url": src["url"],
+                "quality_score": src.get("quality_score", 0.8),
+                "relevance_score": relevance,
+                "is_curated": True,
+                "content_type": src.get("content_type", "courses"),
+                "subjects": src_subjects,
+            })
+        
+        return results
     
     async def _fetch_mit_ocw(self, query: str, limit: int) -> List[Dict[str, Any]]:
         """

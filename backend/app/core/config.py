@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     AI_TUTOR_MODEL: str = "gpt-3.5-turbo"  # Fallback/legacy
     EMBEDDING_MODEL_NAME: str = "local_fast"
     BACKEND_CORS_ORIGINS: List[str] = []
+    
+    # Crawler API keys
+    YOUTUBE_API_KEY: Optional[str] = None
+    GITHUB_ACCESS_TOKEN: Optional[str] = None
 
     class Config:
         case_sensitive = True

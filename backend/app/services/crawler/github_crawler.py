@@ -3,10 +3,12 @@ GitHub Crawler - Fetches educational repository metadata
 Uses PyGithub library for GitHub API access (wrapped in async)
 """
 import os
+import json
 import logging
 import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from pathlib import Path
 
 from github import Github, GithubException
 
@@ -20,6 +22,7 @@ class GitHubCrawler(BaseCrawler):
     """
     Crawler for GitHub educational repositories.
     Fetches repository metadata, README content, and code structure.
+    Uses curated repository lists for higher quality results.
     """
     
     # Educational topic keywords for filtering
@@ -28,67 +31,108 @@ class GitHubCrawler(BaseCrawler):
         "examples", "exercises", "practice", "bootcamp", "curriculum"
     ]
     
-    # High-quality educational organizations
-    TRUSTED_ORGS = {
-        "microsoft": 1.0,
-        "google": 1.0,
-        "facebook": 0.95,
-        "tensorflow": 0.95,
-        "pytorch": 0.95,
-        "scikit-learn": 0.9,
-        "keras-team": 0.9,
-        "huggingface": 0.95,
-        "openai": 0.95,
-        "fastai": 0.9,
-        "donnemartin": 0.85,
-        "TheAlgorithms": 0.9,
-    }
-    
     def __init__(self, access_token: Optional[str] = None):
         super().__init__("GitHub")
         self.access_token = access_token or os.getenv("GITHUB_ACCESS_TOKEN")
         self.github = Github(self.access_token) if self.access_token else Github()
+        self.curated_repos = self._load_curated_repos()
     
-    async def fetch(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def _load_curated_repos(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Load curated repositories from config file."""
+        config_path = Path(__file__).parent.parent.parent / "config" / "curated_github.json"
+        try:
+            with open(config_path, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load curated GitHub config: {e}")
+            return {}
+    
+    def get_curated_repos_for_subject(self, subject: str) -> List[str]:
+        """
+        Get curated repo names for a subject.
+        Returns list of 'owner/repo' strings.
+        """
+        subject_lower = subject.lower()
+        
+        if any(kw in subject_lower for kw in ["data", "statistic", "machine learning", "ml", "pandas", "numpy"]):
+            repos = self.curated_repos.get("data_science", [])
+        elif any(kw in subject_lower for kw in ["ai", "artificial", "neural", "deep learning", "llm", "nlp"]):
+            repos = self.curated_repos.get("artificial_intelligence", [])
+        elif any(kw in subject_lower for kw in ["software", "programming", "web", "backend", "frontend", "algorithm"]):
+            repos = self.curated_repos.get("software_engineering", [])
+        else:
+            # Combine all repos for unknown subjects
+            repos = []
+            for repo_list in self.curated_repos.values():
+                repos.extend(repo_list)
+        
+        return [r["repo"] for r in repos if "repo" in r]
+    
+    async def fetch(self, query: str, limit: int = 10, subject: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Fetch GitHub repositories matching the query.
-        Prioritizes educational and well-documented repos.
+        If subject is provided, prioritizes curated repos for that subject.
         Uses asyncio.to_thread to wrap sync PyGithub calls.
         """
         try:
             # Run sync GitHub API calls in thread pool
             return await asyncio.to_thread(
-                self._fetch_sync, query, limit
+                self._fetch_sync, query, limit, subject
             )
         except Exception as e:
             logger.error(f"GitHub API error: {e}")
             return self._get_mock_data(query, limit)
     
-    def _fetch_sync(self, query: str, limit: int) -> List[Dict[str, Any]]:
+    def _fetch_sync(self, query: str, limit: int, subject: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Synchronous fetch implementation (runs in thread pool).
+        Prioritizes curated repos when subject is provided.
         """
-        # Build search query with educational focus
-        search_query = f"{query} in:name,description,readme"
-        
-        # Search repositories
-        repos = self.github.search_repositories(
-            query=search_query,
-            sort="stars",
-            order="desc"
-        )
-        
         results = []
-        for repo in repos[:limit * 2]:  # Fetch more to filter
-            try:
-                repo_data = self._extract_repo_data(repo)
-                if repo_data:
-                    results.append(repo_data)
-                    if len(results) >= limit:
-                        break
-            except GithubException as e:
-                logger.debug(f"Error fetching repo {repo.full_name}: {e}")
-                continue
+        
+        # First, try to fetch from curated repos if subject is provided
+        if subject:
+            curated_repo_names = self.get_curated_repos_for_subject(subject)
+            query_lower = query.lower()
+            
+            for repo_name in curated_repo_names[:10]:  # Limit API calls
+                if len(results) >= limit:
+                    break
+                try:
+                    repo = self.github.get_repo(repo_name)
+                    # Check if query matches repo content
+                    repo_text = f"{repo.name} {repo.description or ''} {' '.join(repo.get_topics() or [])}".lower()
+                    if any(word in repo_text for word in query_lower.split()):
+                        repo_data = self._extract_repo_data(repo)
+                        if repo_data:
+                            repo_data["is_curated"] = True
+                            results.append(repo_data)
+                except GithubException as e:
+                    logger.debug(f"Error fetching curated repo {repo_name}: {e}")
+                    continue
+        
+        # If not enough results, fall back to general search
+        if len(results) < limit:
+            search_query = f"{query} in:name,description,readme"
+            repos = self.github.search_repositories(
+                query=search_query,
+                sort="stars",
+                order="desc"
+            )
+            
+            for repo in repos[:limit * 2]:
+                if len(results) >= limit:
+                    break
+                try:
+                    # Skip if already in results
+                    if any(r.get("full_name") == repo.full_name for r in results):
+                        continue
+                    repo_data = self._extract_repo_data(repo)
+                    if repo_data:
+                        results.append(repo_data)
+                except GithubException as e:
+                    logger.debug(f"Error fetching repo {repo.full_name}: {e}")
+                    continue
         
         return results
     
@@ -191,10 +235,20 @@ class GitHubCrawler(BaseCrawler):
         """
         score = 0.0
         
-        # Trusted organization bonus
+        # Curated repo/organization bonus
         owner = raw_data.get("owner", "").lower()
-        if owner in self.TRUSTED_ORGS:
-            score += self.TRUSTED_ORGS[owner] * 0.25
+        full_name = raw_data.get("full_name", "").lower()
+        is_curated = raw_data.get("is_curated", False)
+        
+        # Check if repo is from curated list
+        curated_repos = []
+        for repo_list in self.curated_repos.values():
+            curated_repos.extend([r.get("repo", "").lower() for r in repo_list])
+        
+        if is_curated or full_name in curated_repos:
+            score += 0.25  # Curated bonus
+        elif any(owner in repo for repo in curated_repos):
+            score += 0.15  # Known org bonus
         else:
             score += 0.05
         
