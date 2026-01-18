@@ -7,8 +7,8 @@ interface TutorExplanationProps {
 // Simple markdown-like renderer - no complex section parsing
 export default function TutorExplanation({ content }: TutorExplanationProps) {
   return (
-    <div className="prose prose-sm max-w-none">
-      <div className="text-gray-700 leading-relaxed">
+    <div className="prose prose-sm max-w-none overflow-visible">
+      <div className="text-gray-700 leading-relaxed pb-2">
         {renderContent(content)}
       </div>
     </div>

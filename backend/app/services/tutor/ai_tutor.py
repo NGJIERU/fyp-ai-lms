@@ -873,20 +873,79 @@ I found the following relevant information in your course materials that answers
 *(Note: The OpenAI API key is currently invalid/missing, so I cannot generate a custom explanation. However, the search results above are accurate from your uploaded documents.)*"""
             
         elif "generate" in prompt_lower and "questions" in prompt_lower:
-             # Extract topic
+            # Extract topic
             topic = "the topic"
             topic_match = re.search(r"Topic: (.*)", prompt)
             if topic_match:
                 topic = topic_match.group(1).strip()
 
-            return f"""Here are some practice questions based on **{topic}** (Offline Mode):
+            # Return proper JSON format for MCQ questions
+            return f"""```json
+[
+  {{
+    "question": "What is a fundamental concept of {topic}?",
+    "options": {{
+      "A": "It is primarily a theoretical framework with no practical applications",
+      "B": "It combines multiple disciplines to solve real-world problems",
+      "C": "It only applies to academic research settings",
+      "D": "It has been replaced by newer methodologies"
+    }},
+    "correct_answer": "B",
+    "explanation": "This topic integrates various approaches to address practical challenges.",
+    "cognitive_level": "understand"
+  }},
+  {{
+    "question": "Which of the following best describes the main purpose of {topic}?",
+    "options": {{
+      "A": "To memorize facts without understanding",
+      "B": "To apply knowledge to solve problems effectively",
+      "C": "To avoid using technology in learning",
+      "D": "To focus only on theoretical concepts"
+    }},
+    "correct_answer": "B",
+    "explanation": "The main goal is practical application of knowledge.",
+    "cognitive_level": "apply"
+  }},
+  {{
+    "question": "How does {topic} contribute to professional development?",
+    "options": {{
+      "A": "It provides skills that are applicable in various industries",
+      "B": "It is only useful for academic purposes",
+      "C": "It has no impact on career growth",
+      "D": "It focuses solely on outdated practices"
+    }},
+    "correct_answer": "A",
+    "explanation": "Skills learned are transferable across multiple professional contexts.",
+    "cognitive_level": "analyze"
+  }},
+  {{
+    "question": "What is a key benefit of understanding {topic}?",
+    "options": {{
+      "A": "Limited career opportunities",
+      "B": "Enhanced problem-solving abilities",
+      "C": "Reduced critical thinking skills",
+      "D": "Decreased adaptability"
+    }},
+    "correct_answer": "B",
+    "explanation": "Understanding this topic enhances analytical and problem-solving capabilities.",
+    "cognitive_level": "understand"
+  }},
+  {{
+    "question": "Which approach is most effective when studying {topic}?",
+    "options": {{
+      "A": "Passive reading without practice",
+      "B": "Active engagement with hands-on exercises",
+      "C": "Avoiding all practical applications",
+      "D": "Memorizing without understanding concepts"
+    }},
+    "correct_answer": "B",
+    "explanation": "Active learning with practice leads to better retention and understanding.",
+    "cognitive_level": "apply"
+  }}
+]
+```
 
-1. Define the core concepts of {topic} based on the course notes.
-2. Explain the significance of {topic} in the context of this course.
-3. Compare and contrast the key elements found in the materials regarding {topic}.
-4. Discuss the practical applications of {topic}.
-
-*Study Tip: Use the search feature or 'Auto-Discover' to find more detailed slides on this topic!*"""
+*(Generated in Offline Mode - Connect OpenAI API for topic-specific questions)*"""
             
         elif "check" in prompt_lower or "evaluate" in prompt_lower:
              return f"""✨ **Smart Offline Feedback**
