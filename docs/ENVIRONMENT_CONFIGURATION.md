@@ -28,11 +28,11 @@ The project is configured via `.env` files. Below is the reference table:
 ## 7.2 Configuration Management
 
 ### **Which values differ across environments?**
-| Env | `POSTGRES_SERVER` | `SECRET_KEY` | `NEXT_PUBLIC_API_BASE_URL` |
+| Env | `DATABASE_URL` / `POSTGRES_SERVER` | `SECRET_KEY` | `NEXT_PUBLIC_API_BASE_URL` |
 | :--- | :--- | :--- | :--- |
-| **Local** | `localhost` | `dev-key` | `http://localhost:8000` |
+| **Local** | `localhost` (PostgreSQL) | `dev-key` | `http://localhost:8000` |
 | **Docker** | `db` (Service Name) | `dev-key` | `http://localhost:8000` |
-| **Production** | `db.production.com` | **Secure 64-char String** | `https://api.myapp.com` |
+| **Production (Fly.io)** | `postgresql://...@db.xxx.supabase.co` | **Fly.io Secret** | `https://fyp-ai-lms-backend.fly.dev` |
 
 ### **What happens if an env variable is missing?**
 *   **Startup Failure:** The Backend uses Pydantic Settings (`app/core/config.py`). If a required field (like `SECRET_KEY`) is missing, the application **refuses to start** and prints a validation error.
@@ -43,12 +43,21 @@ The project is configured via `.env` files. Below is the reference table:
 *   **Git History:** Once committed, a secret is forever in the git history unless rewritten. We use `.gitignore` to prevent files like `.env` and `.env.local` from being tracked.
 
 ### **How can a new developer configure this project?**
-1.  **Clone** the repo.
+1.  **Clone** the repo: `git clone https://github.com/NGJIERU/fyp-ai-lms.git`
 2.  **Copy Templates:**
     *   `cp backend/.env.example backend/.env`
     *   `cp frontend/.env.example frontend/.env.local`
-3.  **Fill Values:** Update the `.env` files with their local credentials (or ask the team lead for shared dev secrets).
-4.  **Run:** `docker-compose up`.
+3.  **Fill Values:** Update the `.env` files with local PostgreSQL credentials.
+4.  **Run Backend:** `cd backend && uvicorn app.main:app --reload`
+5.  **Run Frontend:** `cd frontend && npm run dev`
+
+### **Production Environment Variables (Fly.io)**
+Secrets are set via Fly.io CLI:
+```bash
+fly secrets set DATABASE_URL="postgresql://postgres:PASSWORD@db.xxx.supabase.co:5432/postgres"
+fly secrets set SECRET_KEY="your-secure-key"
+fly secrets set HUGGINGFACE_API_TOKEN="hf_xxx"
+```
 
 ### **How do I separate dev vs prod behavior?**
 *   **Docker Compose Overrides:** We use `docker-compose.yml` for base config and `docker-compose.prod.yml` for production overrides (like restarting policies and volume bindings).

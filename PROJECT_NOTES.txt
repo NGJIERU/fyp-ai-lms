@@ -1,7 +1,7 @@
 ================================================================================
                     AI-POWERED LMS - PROJECT NOTES & DEVELOPER GUIDE
 ================================================================================
-                            Last Updated: January 6, 2026
+                            Last Updated: January 18, 2026
 ================================================================================
 
 TABLE OF CONTENTS
@@ -24,8 +24,18 @@ TABLE OF CONTENTS
 This is an AI-powered Learning Management System (LMS) with the following stack:
 - Backend: FastAPI (Python) with SQLAlchemy ORM
 - Frontend: Next.js 16 (React/TypeScript)
-- Database: SQLite (development) / PostgreSQL (production)
+- Database: PostgreSQL (local development & production via Supabase)
 - AI Provider: HuggingFace Inference API (Qwen/Qwen2.5-72B-Instruct model)
+
+LIVE DEPLOYMENT:
+- Frontend: https://fyp-ai-lms.vercel.app (Vercel)
+- Backend API: https://fyp-ai-lms-backend.fly.dev (Fly.io)
+- Database: Supabase PostgreSQL (Singapore region)
+
+DEMO CREDENTIALS:
+- Admin: admin@lms.edu / admin123
+- Lecturer: smith@lms.edu / lecturer123
+- Student: alice@lms.edu / student123
 
 ================================================================================
 2. RUNNING THE PROJECT
@@ -56,8 +66,11 @@ BACKEND (.env file in /backend/)
 --------------------------------
 Required variables:
 
-# Database (SQLite for development)
-SQLALCHEMY_DATABASE_URI=sqlite:///./demo.db
+# Database (PostgreSQL for both local and production)
+POSTGRES_SERVER=localhost
+POSTGRES_USER=your_username
+POSTGRES_PASSWORD=your_password
+POSTGRES_DB=lms_db
 
 # Security
 SECRET_KEY=your-secret-key-change-in-production
@@ -73,6 +86,12 @@ USE_OPENAI_EMBEDDINGS=false
 
 # CORS
 BACKEND_CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
+
+PRODUCTION (Fly.io secrets):
+---------------------------
+fly secrets set DATABASE_URL="postgresql://postgres:PASSWORD@db.xxx.supabase.co:5432/postgres"
+fly secrets set SECRET_KEY="your-secure-key"
+fly secrets set HUGGINGFACE_API_TOKEN="hf_xxx"
 
 
 FRONTEND (.env.local file in /frontend/)
@@ -289,10 +308,27 @@ POST /api/v1/materials/{id}/rate            - Rate a material
 9. DATABASE NOTES
 ================================================================================
 
-DEVELOPMENT DATABASE
+DATABASE INFRASTRUCTURE
+-----------------------
+| Environment | Database       | Host                              |
+|-------------|----------------|-----------------------------------|
+| Local Dev   | PostgreSQL 15  | localhost:5432 (lms_db)           |
+| Production  | PostgreSQL 15  | Supabase (Singapore region)       |
+
+NOTE: SQLite files (demo.db, lms.db, ai_lms.db) are legacy and NOT used.
+      You can safely delete them.
+
+LOCAL DATABASE SETUP
 --------------------
-- Location: backend/demo.db (SQLite)
-- Reset: Delete demo.db and restart backend to recreate
+- Install PostgreSQL 15+
+- Create database: createdb lms_db
+- Run migrations: cd backend && alembic upgrade head
+- Seed data: python scripts/seeds/setup_demo.py
+
+PRODUCTION DATABASE (Supabase)
+------------------------------
+- Seed: fly ssh console --app fyp-ai-lms-backend -C "python /app/scripts/seeds/setup_demo.py"
+- Migrate local to production: python scripts/migrate_to_supabase_v2.py
 
 KEY MODELS
 ----------

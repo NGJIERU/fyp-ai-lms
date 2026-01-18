@@ -1,8 +1,84 @@
 # Deployment Guide - AI-Powered LMS
 
-This guide covers deploying the AI-Powered LMS to a cloud VM with Nginx, PostgreSQL, and HTTPS.
+This guide covers deploying the AI-Powered LMS to production using **Vercel** (frontend), **Fly.io** (backend), and **Supabase** (PostgreSQL database).
 
-## Prerequisites
+## Current Production Deployment
+
+| Service | Platform | URL |
+|---------|----------|-----|
+| Frontend | Vercel | https://fyp-ai-lms.vercel.app |
+| Backend | Fly.io | https://fyp-ai-lms-backend.fly.dev |
+| Database | Supabase | PostgreSQL (Singapore region) |
+
+---
+
+## Option 1: Cloud Deployment (Recommended)
+
+### Prerequisites
+- GitHub account with repository access
+- Vercel account (free tier)
+- Fly.io account (free tier)
+- Supabase account (free tier)
+
+### Step 1: Set Up Supabase Database
+
+1. Create a new project at [supabase.com](https://supabase.com)
+2. Choose a region close to your users (e.g., Singapore)
+3. Copy the connection string from Settings → Database:
+   ```
+   postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+   ```
+4. **Important:** URL-encode special characters in password (e.g., `@` → `%40`)
+
+### Step 2: Deploy Backend to Fly.io
+
+```bash
+# Install Fly CLI
+curl -L https://fly.io/install.sh | sh
+
+# Login
+fly auth login
+
+# Navigate to backend
+cd backend
+
+# Create app (first time only)
+fly apps create fyp-ai-lms-backend
+
+# Set secrets
+fly secrets set DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@db.xxx.supabase.co:5432/postgres"
+fly secrets set SECRET_KEY="your-secure-secret-key"
+fly secrets set HUGGINGFACE_API_TOKEN="hf_xxx"
+
+# Deploy
+fly deploy --wait-timeout 300
+```
+
+### Step 3: Deploy Frontend to Vercel
+
+1. Go to [vercel.com](https://vercel.com) → Add New Project
+2. Import your GitHub repository: `NGJIERU/fyp-ai-lms`
+3. Configure:
+   - **Root Directory:** `frontend`
+   - **Framework Preset:** Next.js
+4. Add Environment Variable:
+   - `NEXT_PUBLIC_API_BASE_URL` = `https://fyp-ai-lms-backend.fly.dev`
+5. Click Deploy
+
+### Step 4: Seed Database
+
+```bash
+# SSH into Fly.io and run seed script
+fly ssh console --app fyp-ai-lms-backend -C "python /app/scripts/seeds/setup_demo.py"
+```
+
+---
+
+## Option 2: Traditional VM Deployment
+
+> For deploying to a self-managed Ubuntu server with Nginx.
+
+### Prerequisites
 
 - Ubuntu 22.04 LTS (or similar)
 - Domain name pointing to your server

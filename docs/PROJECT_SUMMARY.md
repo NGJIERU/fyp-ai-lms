@@ -112,30 +112,49 @@ This is a comprehensive AI-powered Learning Management System (LMS) built with F
 
 | Component | Technology |
 |-----------|------------|
+| Frontend | Next.js 16 (React) |
 | Backend | FastAPI 0.109.0 |
-| Database | PostgreSQL + SQLAlchemy 2.0 |
+| Database | PostgreSQL 15 (Supabase) + SQLAlchemy 2.0 |
 | Auth | JWT (python-jose) |
-| Embeddings | sentence-transformers |
-| LLM | OpenAI GPT-3.5/4 |
+| Embeddings | sentence-transformers (all-MiniLM-L6-v2) |
+| LLM | HuggingFace (Qwen2.5-72B-Instruct) |
 | Crawling | BeautifulSoup, PyGithub, arxiv, youtube-transcript-api |
 | Testing | pytest, httpx |
+| **Deployment** | |
+| Frontend Hosting | Vercel |
+| Backend Hosting | Fly.io |
+| Database Hosting | Supabase |
 
-## Quick Start
+## Live Demo
+
+| Service | URL |
+|---------|-----|
+| **Frontend** | https://fyp-ai-lms.vercel.app |
+| **Backend API** | https://fyp-ai-lms-backend.fly.dev |
+| **API Docs** | https://fyp-ai-lms-backend.fly.dev/docs |
+
+**Demo Credentials:**
+- Admin: `admin@lms.edu` / `admin123`
+- Lecturer: `smith@lms.edu` / `lecturer123`
+- Student: `alice@lms.edu` / `student123`
+
+## Quick Start (Local Development)
 
 ### 1. Install Dependencies
 ```bash
+cd backend
 pip install -r requirements.txt
 ```
 
 ### 2. Configure Environment
-Create `.env` file:
+Create `backend/.env` file:
 ```env
 POSTGRES_SERVER=localhost
 POSTGRES_USER=your_user
 POSTGRES_PASSWORD=your_password
 POSTGRES_DB=lms_db
 SECRET_KEY=your-secret-key-change-in-production
-OPENAI_API_KEY=sk-your-openai-key  # Optional
+HUGGINGFACE_API_TOKEN=hf_xxx  # For AI Tutor
 YOUTUBE_API_KEY=your-youtube-key   # Optional
 GITHUB_ACCESS_TOKEN=your-token     # Optional
 ```

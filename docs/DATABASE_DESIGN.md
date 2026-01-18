@@ -2,12 +2,20 @@
 
 ## 6.1 Schema & Entities
 
+### **Database Infrastructure**
+
+| Environment | Database | Host |
+|-------------|----------|------|
+| **Local Development** | PostgreSQL 15 | `localhost:5432` |
+| **Production** | PostgreSQL 15 | Supabase (Singapore region) |
+
 ### **Why did I choose this database type?**
-*   **Database:** **PostgreSQL**.
+*   **Database:** **PostgreSQL** (both local and production via Supabase).
 *   **Reasoning:**
     *   **Relational Integrity:** We need strict relationships (Lecturer -> Course -> Student).
     *   **JSONB Support:** Postgres handles semi-structured data (like Quiz Questions or User Settings) effectively using JSONB columns, offering the best of SQL and NoSQL.
     *   **Vector Search (Future Proof):** Postgres has `pgvector` extension support, which is critical for future RAG optimization if we move vector storage to the DB.
+    *   **Supabase:** Provides managed PostgreSQL with automatic backups, connection pooling, and a web dashboard.
 
 ### **What are the main entities?**
 1.  **User:** Stores authentication info and Roles (`student`, `lecturer`, `super_admin`).
@@ -59,13 +67,16 @@
 ## 6.3 Data Operations
 
 ### **How do I seed test data?**
-*   Script: `scripts/seed_db.py` (or similar).
-*   Logic: Creates a default "Super Admin" and "Demo Lecturer" if they don't exist. Useful for initializing a fresh Docker container.
+*   Script: `scripts/seeds/setup_demo.py`
+*   Logic: Creates demo users (Admin, Lecturers, Students), courses, syllabus, and sample materials.
+*   **Local:** `python scripts/seeds/setup_demo.py`
+*   **Production (Fly.io):** `fly ssh console --app fyp-ai-lms-backend -C "python /app/scripts/seeds/setup_demo.py"`
 
 ### **What constraints prevent invalid data?**
 *   **Database Level:** SQL Constraints (`CHECK score >= 0`).
 *   **Application Level Pydantic:** Validates formats (Email, URL) before hitting the DB.
 
 ### **How do I back up data?**
-*   **Docker Volume:** The Postgres container stores data in a persistent Docker volume (`postgres_data`).
-*   **Dump Command:** `pg_dump -U user -d dbname > backup.sql` (can be automated via a cron job).
+*   **Local:** `pg_dump -U jieru_0901 -d lms_db > backup.sql`
+*   **Production (Supabase):** Automatic daily backups via Supabase dashboard. Manual export available in Settings → Database → Backups.
+*   **Migration Script:** `scripts/migrate_to_supabase_v2.py` can sync local data to production.

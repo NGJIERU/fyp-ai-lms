@@ -2,29 +2,49 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
-![Next.js](https://img.shields.io/badge/next.js-13-black)
-![Docker](https://img.shields.io/badge/docker-ready-green)
+![Next.js](https://img.shields.io/badge/next.js-16-black)
+![PostgreSQL](https://img.shields.io/badge/postgresql-15-blue)
 
 A Final Year Project (FYP) implementing an intelligent LMS with personalized AI Tutoring, RAG-based recommendations, and automated content generation.
 
-## 🚀 Quick Start
+## 🌐 Live Demo
 
-**Prerequisites:** Docker & Docker Compose.
+| Service | URL |
+|---------|-----|
+| **Frontend** | https://fyp-ai-lms.vercel.app |
+| **Backend API** | https://fyp-ai-lms-backend.fly.dev |
+| **API Docs** | https://fyp-ai-lms-backend.fly.dev/docs |
+
+**Demo Credentials:**
+- **Admin:** `admin@lms.edu` / `admin123`
+- **Lecturer:** `smith@lms.edu` / `lecturer123`
+- **Student:** `alice@lms.edu` / `student123`
+
+## 🚀 Quick Start (Local Development)
+
+**Prerequisites:** Python 3.11, Node.js 18+, PostgreSQL 15+
 
 ```bash
 # 1. Clone the repository
-git clone <repo-url>
-cd fyp_antigravity_5Dec_py
+git clone https://github.com/NGJIERU/fyp-ai-lms.git
+cd fyp-ai-lms
 
-# 2. Configure Environment
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env.local
+# 2. Backend Setup
+cd backend
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env  # Edit with your credentials
+uvicorn app.main:app --reload --port 8000
 
-# 3. Start the Application
-docker-compose up --build
+# 3. Frontend Setup (new terminal)
+cd frontend
+npm install
+cp .env.example .env.local  # Edit NEXT_PUBLIC_API_BASE_URL
+npm run dev
 ```
 
-Access the application:
+Access locally:
 *   **Frontend:** [http://localhost:3000](http://localhost:3000)
 *   **Backend API Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
@@ -56,10 +76,19 @@ We have comprehensive documentation available in the `docs/` directory:
 
 The system follows a **Modular Monolith** architecture:
 
-*   **Frontend:** Next.js (React) for a responsive, interactive UI.
-*   **Backend:** FastAPI (Python) for high-performance API and AI orchestration.
-*   **Database:** PostgreSQL/SQLite for relational data persistence.
-*   **AI Engine:** OpenAI (GPT-4) integration for the AI Tutor and Content Generator.
+*   **Frontend:** Next.js 16 (React) deployed on **Vercel**
+*   **Backend:** FastAPI (Python) deployed on **Fly.io**
+*   **Database:** PostgreSQL on **Supabase** (cloud)
+*   **AI Engine:** HuggingFace (Qwen2.5-72B) + local embeddings (sentence-transformers)
+
+### Deployment Architecture
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Vercel        │────▶│   Fly.io         │────▶│   Supabase      │
+│   (Frontend)    │     │   (Backend)      │     │   (PostgreSQL)  │
+│   Next.js 16    │     │   FastAPI        │     │   Database      │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+```
 
 ## 🤝 Contributing
 
